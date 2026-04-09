@@ -41,13 +41,13 @@ $totalRounds = count($matrix);
 $totalStops = count($stopsMap);
 ?>
 
-<div class="mb-8 flex justify-between items-end">
+<div class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
     <div>
-        <h1 class="text-3xl font-bold text-primary">ตารางรถวิ่ง</h1>
-        <p class="text-gray-500 mt-2">จัดการรอบรถ เวลา และจุดจอดของสถานี</p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-primary">ตารางรถวิ่ง</h1>
+        <p class="text-gray-500 mt-1 sm:mt-2 text-sm sm:text-base">จัดการรอบรถ เวลา และจุดจอดของสถานี</p>
     </div>
-    <div class="flex space-x-3">
-        <button onclick="addStop()" class="bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg text-sm px-4 py-2.5 transition-all duration-200 border border-gray-700 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0">
+    <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <button onclick="addStop()" class="bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg text-sm px-4 py-2.5 transition-all duration-200 border border-gray-700 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 w-full sm:w-auto">
             + เพิ่มจุดจอด
         </button>
         <button onclick="addRound()" class="bg-primary hover:bg-orange-600 text-white font-medium rounded-lg text-sm px-4 py-2.5 transition-all duration-200 shadow-lg shadow-primary/30 hover:shadow-orange-500/50 hover:-translate-y-0.5 active:translate-y-0">
@@ -58,7 +58,7 @@ $totalStops = count($stopsMap);
 
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-    <div class="bg-cardbg p-6 rounded-2xl shadow-sm border border-gray-700">
+    <div class="bg-cardbg stagger-1 p-6 rounded-2xl shadow-sm border border-gray-700">
         <div class="flex items-center mb-2">
             <div class="p-3 rounded-lg bg-orange-500/20 text-orange-400 mr-4">
                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -68,7 +68,7 @@ $totalStops = count($stopsMap);
         <div class="text-3xl font-bold text-white"><?php echo number_format($totalRounds); ?> <span class="text-sm font-normal text-gray-500">รอบ</span></div>
     </div>
     
-    <div class="bg-cardbg p-6 rounded-2xl shadow-sm border border-gray-700">
+    <div class="bg-cardbg stagger-2 p-6 rounded-2xl shadow-sm border border-gray-700">
         <div class="flex items-center mb-2">
             <div class="p-3 rounded-lg bg-blue-500/20 text-blue-400 mr-4">
                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -80,7 +80,7 @@ $totalStops = count($stopsMap);
 </div>
 
 <!-- Schedule Matrix Table -->
-<div class="bg-cardbg rounded-2xl shadow-sm border border-gray-700 mb-8 overflow-hidden">
+<div class="bg-cardbg stagger-3 rounded-2xl shadow-sm border border-gray-700 mb-8 overflow-hidden">
     <div class="p-6 border-b border-gray-700 flex justify-between items-center">
         <h2 class="text-xl font-bold text-white flex items-center">
             <svg class="w-6 h-6 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>

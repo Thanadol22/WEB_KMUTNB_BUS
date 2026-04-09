@@ -53,13 +53,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     </script>
+    <style>
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        button[type="submit"] {
+            transition: all 0.2s ease-in-out;
+        }
+        button[type="submit"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 64, 9, 0.4);
+        }
+        button[type="submit"]:active {
+            transform: translateY(1px);
+        }
+    </style>
 </head>
 <body class="bg-cover bg-center bg-no-repeat text-white font-sans flex items-center justify-center h-screen relative" style="background-image: url('assets/images/loadscreen.png');">
     <!-- Overlay filter to darken the background -->
     <div class="absolute inset-0 bg-black/60 z-0"></div>
 
     <!-- Added backdrop-blur to make the login box stand out on top of the image -->
-    <div class="bg-cardbg/80 backdrop-blur-md p-8 rounded-xl shadow-2xl border border-gray-700/50 w-full max-w-sm z-10">
+    <div class="animate-fade-in-up bg-cardbg/80 backdrop-blur-md p-8 rounded-xl shadow-2xl border border-gray-700/50 w-full max-w-sm z-10">
         <div class="text-center mb-8">
             <h1 class="text-2xl font-bold text-primary">KMUTNB BUS ADMIN</h1>
             <p class="text-gray-400 mt-2">กรุณาเข้าสู่ระบบเพื่อจัดการข้อมูล</p>

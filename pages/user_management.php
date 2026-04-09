@@ -1,16 +1,16 @@
-<div class="flex justify-between items-center mb-6">
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
     <div>
-        <h1 class="text-3xl font-bold text-primary">ระบบจัดการผู้ใช้งาน</h1>
-        <p class="text-gray-400 mt-2">จัดการข้อมูลนักศึกษา และพนักงานขับรถ</p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-primary">ระบบจัดการผู้ใช้งาน</h1>
+        <p class="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">จัดการข้อมูลนักศึกษา และพนักงานขับรถ</p>
     </div>
-    <button onclick="openUserModal()" class="bg-primary hover:bg-accent text-white font-semibold py-2 px-4 rounded-lg flex items-center transition-colors shadow-lg">
+    <button onclick="openUserModal()" class="w-full sm:w-auto bg-primary hover:bg-accent text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center transition-colors shadow-lg">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         เพิ่มผู้ใช้ใหม่
     </button>
 </div>
 
 <!-- Filters & Search -->
-<div class="bg-cardbg p-4 rounded-xl shadow-lg border border-gray-700 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
+<div class="bg-cardbg stagger-1 p-4 rounded-xl shadow-lg border border-gray-700 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
     <div class="flex space-x-2" id="filter-container">
         <button data-role="all" class="filter-btn px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-600 hover:bg-gray-700 active-filter">ทั้งหมด</button>
         <button data-role="student" class="filter-btn px-4 py-2 rounded-lg bg-transparent text-gray-400 border border-transparent hover:bg-gray-800">นักศึกษา</button>
@@ -23,7 +23,7 @@
 </div>
 
 <!-- Users Table -->
-<div class="bg-cardbg rounded-xl shadow-lg border border-gray-700 overflow-hidden">
+<div class="bg-cardbg stagger-2 rounded-xl shadow-lg border border-gray-700 overflow-hidden">
     <div class="overflow-x-auto">
         <table class="w-full text-left text-sm text-gray-400">
             <thead class="text-xs text-gray-400 uppercase bg-gray-800 border-b border-gray-700">

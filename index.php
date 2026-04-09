@@ -50,6 +50,50 @@ $isDarkMode = ($theme === 'dark');
         ::-webkit-scrollbar-thumb { background: <?php echo $isDarkMode ? '#333' : '#d1d5db'; ?>; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: <?php echo $isDarkMode ? '#555' : '#9ca3af'; ?>; }
         
+        /* Global Animations */
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        /* Staggered animation classes for lists/cards */
+        .stagger-1 { animation-delay: 100ms; opacity: 0; animation-name: fade-in-up; animation-duration: 0.5s; animation-fill-mode: forwards; }
+        .stagger-2 { animation-delay: 200ms; opacity: 0; animation-name: fade-in-up; animation-duration: 0.5s; animation-fill-mode: forwards; }
+        .stagger-3 { animation-delay: 300ms; opacity: 0; animation-name: fade-in-up; animation-duration: 0.5s; animation-fill-mode: forwards; }
+        .stagger-4 { animation-delay: 400ms; opacity: 0; animation-name: fade-in-up; animation-duration: 0.5s; animation-fill-mode: forwards; }
+        .stagger-5 { animation-delay: 500ms; opacity: 0; animation-name: fade-in-up; animation-duration: 0.5s; animation-fill-mode: forwards; }
+
+        /* Generic effects for cards and interactive elements */
+        .bg-cardbg, .card-hover-effect {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease;
+        }
+        .bg-cardbg:hover, .card-hover-effect:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, <?php echo $isDarkMode ? '0.5' : '0.1'; ?>), 0 8px 10px -6px rgba(0, 0, 0, <?php echo $isDarkMode ? '0.3' : '0.05'; ?>);
+        }
+        
+        /* Global button interactive effect */
+        button, a.btn, input[type="submit"] {
+            transition: all 0.2s ease-in-out;
+        }
+        button:not(.no-scale):hover, a.btn:hover, input[type="submit"]:hover {
+            transform: translateY(-1px) !important;
+            filter: brightness(1.1);
+        }
+        button:not(.no-scale):active, a.btn:active, input[type="submit"]:active {
+            transform: translateY(1px) scale(0.98) !important;
+        }
+        
+        /* Table rows hover effect globally */
+        tbody tr {
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+        tbody tr:hover {
+            background-color: <?php echo $isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'; ?> !important;
+        }
+
         <?php if (!$isDarkMode): ?>
         /* Light Theme Overrides */
         .text-white:not(button):not(.bg-primary):not(.bg-red-500):not(.bg-green-500):not(.text-green-800):not(.bg-blue-500):not(.bg-gray-500):not(.text-white-keep) {
@@ -108,16 +152,29 @@ $isDarkMode = ($theme === 'dark');
     </script>
 </head>
 <body class="bg-darkbg text-white font-sans antialiased">
+    <!-- Sidebar Overlay (mobile) -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-40 hidden transition-opacity lg:hidden" onclick="toggleSidebar()"></div>
+
     <div class="flex h-screen overflow-hidden">
-        <aside class="w-64 bg-black border-r border-gray-800 flex flex-col transition-all duration-300">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-black border-r border-gray-800 flex flex-col transition-transform duration-300 transform -translate-x-full lg:relative lg:translate-x-0 lg:flex h-full shadow-2xl lg:shadow-none">
             <?php include 'includes/sidebar.php'; ?>
         </aside>
         
         <div class="flex-1 flex flex-col bg-darkbg overflow-hidden relative">
             
+            <!-- Mobile Header and Hamburger -->
+            <div class="lg:hidden flex items-center justify-between p-4 bg-cardbg border-b border-gray-800 z-10">
+                <div class="flex items-center space-x-3">
+                    <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white focus:outline-none transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                    <span class="font-bold text-primary truncate sm:text-lg text-base">KMUTNB BUS</span>
+                </div>
+            </div>
+
             <!-- Theme Toggle Button -->
-            <div class="absolute top-6 right-6 z-50">
-                <button id="theme-toggle" class="p-2 rounded-full bg-cardbg border <?php echo $isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'; ?> hover:text-primary hover:border-primary transition-colors focus:outline-none shadow-sm">
+            <div class="absolute top-3 right-4 lg:top-6 lg:right-6 z-50">
+                <button id="theme-toggle" class="no-scale p-2 rounded-full bg-cardbg border <?php echo $isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'; ?> hover:text-primary hover:border-primary transition-colors focus:outline-none shadow-sm">
                     <!-- Sun icon for dark mode (to switch to light) -->
                     <svg id="theme-toggle-light-icon" class="w-6 h-6 <?php echo $isDarkMode ? '' : 'hidden'; ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     <!-- Moon icon for light mode (to switch to dark) -->
@@ -127,6 +184,7 @@ $isDarkMode = ($theme === 'dark');
 
             <main class="flex-1 overflow-x-hidden overflow-y-auto bg-darkbg p-6">
                 <!-- Dynamic Content Routing -->
+                <div class="animate-fade-in-up w-full h-full max-w-screen-2xl mx-auto">
                 <?php 
                     $page = isset($_GET['page']) ? preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['page']) : 'dashboard';
                     $pagePath = "pages/{$page}.php";
@@ -137,6 +195,7 @@ $isDarkMode = ($theme === 'dark');
                         echo "<div class='text-center mt-20'><h2 class='text-2xl text-red-500'>404 Page Not Found</h2><p class='text-gray-400 mt-2'>The requested page `{$page}` does not exist.</p></div>";
                     }
                 ?>
+                </div>
             </main>
         </div>
     </div>
@@ -149,6 +208,21 @@ $isDarkMode = ($theme === 'dark');
 
     <!-- Theme Toggle Script -->
     <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            if (sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.add('opacity-100'), 10);
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.remove('opacity-100');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
+            }
+        }
+
         const themeToggleBtn = document.getElementById('theme-toggle');
         // Note: isDarkMode comes from PHP
         let isDarkMode = <?php echo $isDarkMode ? 'true' : 'false'; ?>;

@@ -20,8 +20,8 @@
         $isActive = $currentPage === $item['id'];
         $activeClass = $isActive ? 'bg-primary text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white';
     ?>
-    <a href="?page=<?php echo $item['id']; ?>" class="flex items-center px-4 py-3 rounded-lg transition-colors <?php echo $activeClass; ?>">
-        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <a href="?page=<?php echo $item['id']; ?>" class="flex items-center px-4 py-3 rounded-lg transition-all duration-300 group <?php echo $activeClass; ?> hover:pl-5">
+        <svg class="w-5 h-5 mr-3 transition-transform duration-300 group-hover:scale-110 group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <?php echo $item['icon']; ?>
         </svg>
         <?php echo $item['label']; ?>

@@ -31,12 +31,12 @@ foreach ($buses as $bus) {
 }
 ?>
 
-<div class="mb-8 flex justify-between items-end">
+<div class="mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
     <div>
-        <h1 class="text-3xl font-bold text-primary">Dashboard Overview</h1>
-        <p class="text-gray-400 mt-2">ภาพรวมสถาที่และการจัดการระบบ KMUTNB BUS</p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-primary">Dashboard Overview</h1>
+        <p class="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">ภาพรวมสถาที่และการจัดการระบบ KMUTNB BUS</p>
     </div>
-    <div class="text-xs text-gray-500 bg-gray-300/50 px-3 py-1 rounded-full border border-gray-700">
+    <div class="text-xs text-black font-medium bg-gray-300/80 px-3 py-1 rounded-full border border-gray-500 shadow-sm self-start sm:self-auto">
         อัปเดตล่าสุด: <?php echo date('H:i:s d/m/Y'); ?>
     </div>
 </div>
@@ -44,7 +44,7 @@ foreach ($buses as $bus) {
 <!-- Stats Cards Grid -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <!-- Total Users -->
-    <div class="bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
+    <div class="bg-cardbg stagger-1 p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
         <div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
         </div>
@@ -59,7 +59,7 @@ foreach ($buses as $bus) {
     </div>
 
     <!-- Students -->
-    <div class="bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
+    <div class="bg-cardbg stagger-2 p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
         <div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>
         </div>
@@ -74,7 +74,7 @@ foreach ($buses as $bus) {
     </div>
 
     <!-- Drivers -->
-    <div class="bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
+    <div class="bg-cardbg stagger-3 p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
         <div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
         </div>
@@ -89,7 +89,7 @@ foreach ($buses as $bus) {
     </div>
 
     <!-- Active Buses -->
-    <div class="bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
+    <div class="bg-cardbg stagger-4 p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
         <div class="absolute -right-2 -bottom-2 opacity-10 group-hover:opacity-20 transition-opacity">
             <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         </div>
@@ -106,7 +106,7 @@ foreach ($buses as $bus) {
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
     <!-- Chart Container -->
-    <div class="lg:col-span-2 bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700">
+    <div class="lg:col-span-2 bg-cardbg stagger-5 p-6 rounded-2xl shadow-lg border border-gray-700">
         <h3 class="text-lg font-bold mb-6 text-white flex items-center">
             <svg class="w-5 h-5 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
             สถิติผู้ใช้งานรายบทบาท
@@ -124,11 +124,11 @@ foreach ($buses as $bus) {
             foreach($items as $item): 
                 $h = ($item['val'] / $max) * 100;
             ?>
-            <div class="flex-1 flex flex-col items-center group relative">
-                <div class="absolute -top-8 bg-gray-800 text-xs text-white px-2 py-1 rounded hidden group-hover:block border border-gray-600">
+            <div class="flex-1 flex flex-col justify-end items-center group relative h-full mt-auto">
+                <div class="absolute top-0 -mt-10 bg-gray-800 text-xs text-white px-2 py-1 rounded hidden group-hover:block border border-gray-600 z-10">
                     <?php echo $item['val']; ?> คน
                 </div>
-                <div class="<?php echo $item['color']; ?> w-full rounded-t-lg transition-all duration-700 hover:brightness-110" style="height: <?php echo $h; ?>%"></div>
+                <div class="<?php echo $item['color']; ?> w-full rounded-t-lg transition-all duration-700 hover:brightness-110" style="height: <?php echo $h; ?>%; min-height: 4px;"></div>
                 <div class="absolute -bottom-8 text-xs text-gray-400 font-medium truncate w-full text-center mt-2">
                     <?php echo $item['label']; ?>
                 </div>
@@ -138,7 +138,7 @@ foreach ($buses as $bus) {
     </div>
 
     <!-- Health Check Area -->
-    <div class="bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700 h-full">
+    <div class="bg-cardbg stagger-5 p-6 rounded-2xl shadow-lg border border-gray-700 h-full" style="animation-delay: 600ms;">
         <h3 class="text-lg font-bold mb-6 text-white flex items-center">
             <svg class="w-5 h-5 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
             System Status

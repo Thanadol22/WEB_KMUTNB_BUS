@@ -44,19 +44,19 @@ foreach ($issues as $issue) {
 }
 ?>
 
-<div class="mb-8 flex justify-between items-end">
+<div class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
     <div>
-        <h1 class="text-3xl font-bold text-primary">รายงานปัญหา</h1>
-        <p class="text-gray-400 mt-2">ตรวจสอบและติดตามการแจ้งปัญหาการใช้งานต่างๆ จากผู้ใช้</p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-primary">รายงานปัญหา</h1>
+        <p class="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">ตรวจสอบและติดตามการแจ้งปัญหาการใช้งานต่างๆ จากผู้ใช้</p>
     </div>
-    <div class="flex space-x-3">
-        <select id="statusFilter" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5" onchange="updateIssueFilters()">
+    <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <select id="statusFilter" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 w-full sm:w-auto" onchange="updateIssueFilters()">
             <option value="">ทุกสถานะ</option>
             <option value="pending" <?php echo $selectedStatus === 'pending' ? 'selected' : ''; ?>>รอดำเนินการ</option>
             <option value="resolved" <?php echo $selectedStatus === 'resolved' ? 'selected' : ''; ?>>แก้ไขแล้ว</option>
         </select>
         
-        <a href="?page=issue_reports" class="bg-primary hover:bg-accent text-white font-medium rounded-lg text-sm px-5 py-2.5 transition-colors flex items-center">
+        <a href="?page=issue_reports" class="bg-primary hover:bg-accent text-white font-medium rounded-lg text-sm px-5 py-2.5 transition-colors flex items-center justify-center w-full sm:w-auto">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
             รีเฟรชข้อมูล
         </a>
@@ -65,7 +65,7 @@ foreach ($issues as $issue) {
 
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700 relative overflow-hidden">
+    <div class="bg-cardbg stagger-1 p-6 rounded-2xl shadow-lg border border-gray-700 relative overflow-hidden">
         <div class="absolute -right-4 -bottom-4 opacity-10">
             <svg class="w-32 h-32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
         </div>
@@ -78,7 +78,7 @@ foreach ($issues as $issue) {
         <div class="text-3xl font-bold text-white"><?php echo number_format($pendingIssues); ?> <span class="text-sm font-normal text-gray-500">รายการ</span></div>
     </div>
     
-    <div class="bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700 relative overflow-hidden">
+    <div class="bg-cardbg stagger-2 p-6 rounded-2xl shadow-lg border border-gray-700 relative overflow-hidden">
         <div class="absolute -right-4 -bottom-4 opacity-10">
              <svg class="w-32 h-32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         </div>
@@ -91,7 +91,7 @@ foreach ($issues as $issue) {
         <div class="text-3xl font-bold text-white"><?php echo number_format($resolvedIssues); ?> <span class="text-sm font-normal text-gray-500">รายการ</span></div>
     </div>
 
-    <div class="bg-cardbg p-6 rounded-2xl shadow-lg border border-gray-700 relative overflow-hidden">
+    <div class="bg-cardbg stagger-3 p-6 rounded-2xl shadow-lg border border-gray-700 relative overflow-hidden">
         <div class="absolute -right-4 -bottom-4 opacity-10">
              <svg class="w-32 h-32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16v12H4z"></path></svg>
         </div>
@@ -105,7 +105,7 @@ foreach ($issues as $issue) {
     </div>
 </div>
 
-<div class="bg-cardbg rounded-2xl shadow-sm border border-gray-700 overflow-hidden mb-8">
+<div class="bg-cardbg stagger-4 rounded-2xl shadow-sm border border-gray-700 overflow-hidden mb-8">
     <div class="p-6 border-b border-gray-700 flex justify-between items-center">
         <h2 class="text-xl font-bold text-white flex items-center">
             <svg class="w-6 h-6 mr-2 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -164,7 +164,7 @@ foreach ($issues as $issue) {
                         <td class="px-6 py-4 text-sm text-gray-400 whitespace-nowrap"><?php echo $timeStr; ?></td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
-                                <div class="w-9 h-9 rounded-full bg-gray-700 border border-gray-600 flex items-center justify-center mr-3 text-white font-bold shrink-0">
+                                <div class="w-9 h-9 rounded-full bg-gray-300 border  flex items-center justify-center mr-3 text-white font-bold shrink-0">
                                     <?php echo mb_strtoupper(mb_substr($studentName !== "-" ? $studentName : ($studentId !== "-" ? $studentId : "?"), 0, 1, 'UTF-8'), 'UTF-8'); ?>
                                 </div>
                                 <div class="flex flex-col">

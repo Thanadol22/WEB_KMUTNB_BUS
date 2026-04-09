@@ -231,13 +231,13 @@ $availableStops = array_unique($availableStops);
 
 ?>
 
-<div class="mb-8 flex justify-between items-end">
+<div class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
     <div>
-        <h1 class="text-3xl font-bold text-primary">ประวัติการเดินรถ</h1>
-        <p class="text-gray-400 mt-2">ตรวจสอบตำแหน่งรถจากรอบเวลาล่าสุด (ซิงค์จากตารางเดินรถและ RTDB)</p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-primary">ประวัติการเดินรถ</h1>
+        <p class="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">ตรวจสอบตำแหน่งรถจากรอบเวลาล่าสุด (ซิงค์จากตารางเดินรถและ RTDB)</p>
     </div>
-    <div class="flex space-x-3">
-        <select id="stopFilter" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5" onchange="updateHistoryFilters()">
+    <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <select id="stopFilter" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary w-full sm:w-auto block p-2.5" onchange="updateHistoryFilters()">
             <option value="">ทุกจุดจอด</option>
             <?php foreach ($availableStops as $stopName): ?>
                 <option value="<?php echo htmlspecialchars($stopName); ?>" <?php if($selectedStop === $stopName) echo 'selected'; ?>>
@@ -246,9 +246,9 @@ $availableStops = array_unique($availableStops);
             <?php endforeach; ?>
         </select>
         
-        <input type="date" id="historyDate" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5" value="<?php echo htmlspecialchars($selectedDate); ?>" onchange="updateHistoryFilters()" />
+        <input type="date" id="historyDate" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary w-full sm:w-auto block p-2.5" value="<?php echo htmlspecialchars($selectedDate); ?>" onchange="updateHistoryFilters()" />
         
-        <a href="?page=operation_history&sync=true&date=<?php echo urlencode($selectedDate); ?>&stop=<?php echo urlencode($selectedStop); ?>" class="bg-primary hover:bg-accent text-white font-medium rounded-lg text-sm px-5 py-2.5 transition-colors">
+        <a href="?page=operation_history&sync=true&date=<?php echo urlencode($selectedDate); ?>&stop=<?php echo urlencode($selectedStop); ?>" class="bg-primary hover:bg-accent text-white font-medium rounded-lg text-sm px-5 py-2.5 transition-colors text-center w-full sm:w-auto">
             ดึงข้อมูลล่าสุด
         </a>
     </div>

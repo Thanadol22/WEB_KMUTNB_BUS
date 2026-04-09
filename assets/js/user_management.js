@@ -150,11 +150,11 @@ function renderTable(users) {
     tbody.innerHTML = users.map(user => {
         let roleText = '';
         if (user.role === 'student') {
-            roleText = '<span class="bg-blue-900/50 text-white py-1 px-2 text-xs rounded-full border border-blue-700">นักศึกษา</span>';
+            roleText = '<span class="bg-blue-900/50 text-white py-1 px-2 text-xs rounded-full border border-blue-700 whitespace-nowrap inline-block">นักศึกษา</span>';
         } else if (user.role === 'driver') {
-            roleText = '<span class="bg-green-900/50 text-white py-1 px-2 text-xs rounded-full border border-green-700">พนักงานขับรถ</span>';
+            roleText = '<span class="bg-green-900/50 text-white py-1 px-2 text-xs rounded-full border border-green-700 whitespace-nowrap inline-block">พนักงานขับรถ</span>';
         } else {
-            roleText = `<span class="bg-purple-900/50 text-white py-1 px-2 text-xs rounded-full border border-purple-700">${user.role === 'admin' ? 'ผู้ดูแลระบบ' : (user.role || '-')}</span>`;
+            roleText = `<span class="bg-purple-900/50 text-white py-1 px-2 text-xs rounded-full border border-purple-700 whitespace-nowrap inline-block">${user.role === 'admin' ? 'ผู้ดูแลระบบ' : (user.role || '-')}</span>`;
         }
             
         let statusText = user.status === 'inactive' ? 
