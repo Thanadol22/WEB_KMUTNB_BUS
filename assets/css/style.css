@@ -1,0 +1,43 @@
+:root {
+    --primary-color: #ff4009;
+    --dark-bg: #1a1a1a;
+    --card-bg: #2d2d2d;
+    --text-color: #ffffff;
+}
+
+body {
+    background-color: var(--dark-bg);
+    color: var(--text-color);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    display: flex;
+}
+
+.admin-container {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 250px;
+    background-color: #111;
+    padding: 20px;
+}
+
+.content {
+    flex: 1;
+    padding: 40px;
+}
+
+.status-card {
+    background-color: var(--card-bg);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+h1 {
+    color: var(--primary-color);
+}

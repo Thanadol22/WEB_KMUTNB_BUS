@@ -1,0 +1,23 @@
+# Environment Variables
+.env
+.env.*
+
+# Composer Dependencies
+vendor/
+
+# Node.js Dependencies
+node_modules/
+package-lock.json
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.suo
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Firebase Admin SDK configs
+config/*.json
