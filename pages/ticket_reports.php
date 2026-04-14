@@ -108,6 +108,11 @@ foreach ($tickets as $ticket) {
         <a href="#" onclick="window.location.href='?page=ticket_reports'" class="bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg text-sm px-4 py-2.5 transition-colors flex items-center justify-center w-full sm:w-auto">
             ล้างตัวกรอง
         </a>
+        
+        <a href="services/export_ticket_pdf.php?date=<?php echo urlencode($selectedDate); ?>&bus=<?php echo urlencode($selectedBus); ?>" target="_blank" class="bg-primary hover:bg-accent text-white font-medium rounded-lg text-sm px-4 py-2.5 transition-colors flex items-center justify-center w-full sm:w-auto">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            ส่งออก PDF
+        </a>
     </div>
 </div>
 

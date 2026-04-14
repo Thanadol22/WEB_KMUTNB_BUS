@@ -82,18 +82,41 @@ class FirebaseService {
     private function prepareFirestoreFields($data) {
         $fields = [];
         foreach ($data as $key => $value) {
-            if (is_string($value)) {
-                $fields[$key] = ['stringValue' => $value];
-            } elseif (is_int($value)) {
-                $fields[$key] = ['integerValue' => (string)$value];
-            } elseif (is_bool($value)) {
-                $fields[$key] = ['booleanValue' => $value];
-            } elseif (is_double($value)) {
-                $fields[$key] = ['doubleValue' => $value];
-            }
-            // Add more types if needed
+            $fields[$key] = $this->convertToFirestoreValue($value);
         }
         return $fields;
+    }
+
+    private function convertToFirestoreValue($value) {
+        if (is_string($value)) {
+            return ['stringValue' => $value];
+        } elseif (is_int($value)) {
+            return ['integerValue' => (string)$value];
+        } elseif (is_double($value)) {
+            return ['doubleValue' => $value];
+        } elseif (is_bool($value)) {
+            return ['booleanValue' => $value];
+        } elseif (is_array($value)) {
+            // Check if associative array (map) or sequential array (array data)
+            if (array_keys($value) !== range(0, count($value) - 1) && !empty($value)) {
+                // Map
+                $mapFields = [];
+                foreach ($value as $k => $v) {
+                    $mapFields[$k] = $this->convertToFirestoreValue($v);
+                }
+                return ['mapValue' => ['fields' => $mapFields]];
+            } else {
+                // Array
+                $arrValues = [];
+                foreach ($value as $v) {
+                    $arrValues[] = $this->convertToFirestoreValue($v);
+                }
+                return ['arrayValue' => ['values' => $arrValues]];
+            }
+        } elseif (is_null($value)) {
+            return ['nullValue' => null];
+        }
+        return ['stringValue' => (string)$value];
     }
 
     /**
@@ -105,13 +128,35 @@ class FirebaseService {
         $data = ['id' => $id];
         
         foreach ($fields as $key => $value) {
-            if (isset($value['stringValue'])) $data[$key] = $value['stringValue'];
-            elseif (isset($value['integerValue'])) $data[$key] = (int)$value['integerValue'];
-            elseif (isset($value['doubleValue'])) $data[$key] = (float)$value['doubleValue'];
-            elseif (isset($value['booleanValue'])) $data[$key] = (bool)$value['booleanValue'];
-            elseif (isset($value['timestampValue'])) $data[$key] = $value['timestampValue'];
+            $data[$key] = $this->parseFirestoreValue($value);
         }
         return $data;
+    }
+
+    private function parseFirestoreValue($value) {
+        if (isset($value['stringValue'])) return $value['stringValue'];
+        if (isset($value['integerValue'])) return (int)$value['integerValue'];
+        if (isset($value['doubleValue'])) return (float)$value['doubleValue'];
+        if (isset($value['booleanValue'])) return (bool)$value['booleanValue'];
+        if (isset($value['timestampValue'])) return $value['timestampValue'];
+        if (isset($value['nullValue'])) return null;
+        if (isset($value['mapValue']['fields'])) {
+            $parsedMap = [];
+            foreach ($value['mapValue']['fields'] as $k => $v) {
+                $parsedMap[$k] = $this->parseFirestoreValue($v);
+            }
+            return $parsedMap;
+        }
+        if (isset($value['arrayValue']['values'])) {
+            $parsedArr = [];
+            foreach ($value['arrayValue']['values'] as $v) {
+                $parsedArr[] = $this->parseFirestoreValue($v);
+            }
+            return $parsedArr;
+        }
+        if (array_key_exists('arrayValue', $value) && empty($value['arrayValue'])) return [];
+        if (array_key_exists('mapValue', $value) && empty($value['mapValue'])) return [];
+        return null;
     }
 }
 ?>
