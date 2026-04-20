@@ -13,7 +13,13 @@ const BUS_STOPS_SEQUENCE = [
     { id: 'eng', name: 'วิศวะฯ' }
 ];
 
-// Reference coordinates for distance calculation (approximate bounds per stop - ideally should use actual polygon/latlngs)
+// ─── ETA Constants ────────────────────────────────────────────────────────────
+const FALLBACK_SPEED_KMH = 20;     // ความเร็วเฉลี่ยภายในมหาวิทยาลัย (km/h)
+const ROAD_FACTOR = 1.3;           // ตัวคูณชดเชยเส้นทางจริง vs เส้นตรง
+const AT_STOP_THRESHOLD_M = 80;    // ระยะ (เมตร) ที่ถือว่าถึงป้ายแล้ว
+const MOVING_THRESHOLD_KMH = 3;    // ความเร็วขั้นต่ำที่ถือว่ารถกำลังเคลื่อนที่
+
+// Reference coordinates for distance calculation from Firestore 'locations'
 let busStopCoordinates = [];
 
 // KMUTNB Center Approx coordinates
@@ -331,12 +337,18 @@ function updateBusMarker(id, lat, lng, plate, status, nextStop, eta) {
     });
 
     const popupHtml = `
-        <div class="text-gray-800">
+        <div class="text-gray-800" style="min-width:180px">
             <b class="text-base text-primary">${plate}</b><br>
             <span class="text-xs text-gray-500">สถานะ: ${status}</span><br>
             <hr class="my-1 border-gray-200">
-            สถานีต่อไป: <b>${nextStop}</b><br>
-            ใช้เวลาประมาณ: <b>${eta}</b>
+            <div style="margin-top:4px">
+                <span class="text-xs text-gray-500">สถานีถัดไป:</span><br>
+                <b style="font-size:14px">${nextStop}</b>
+            </div>
+            <div style="margin-top:4px">
+                <span class="text-xs text-gray-500">เวลาถึงโดยประมาณ:</span><br>
+                <b style="color:#f97316;font-size:13px">${eta}</b>
+            </div>
         </div>
     `;
 
@@ -369,70 +381,152 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Predict ETA based on current speed and distance to the next stop
+// ─── Spatial-based ETA Calculation ─────────────────────────────────────────────
+// สูตร: ETA = เวลาปัจจุบัน + (ระยะทางตามเส้นทาง ÷ ความเร็วเฉลี่ย)
 function calculateEta(busId) {
     const bus = busesState[busId];
-    if (!bus || !bus.hasRtdbData || busStopCoordinates.length === 0) return;
-
-    if (predefinedSchedules.length === 0) {
-        bus.metadata.nextStop = "ไม่พบรอบรถ";
-        bus.metadata.eta = "-";
+    if (!bus || !bus.hasRtdbData) {
         return;
     }
 
-    // Get current time in HH:MM format
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const currentTimeStr = `${hours}:${minutes}`;
-
-    // Find the next schedule entry based on current time (finds next stop name)
-    let nextSchedule = null;
-    for (let i = 0; i < predefinedSchedules.length; i++) {
-        if (predefinedSchedules[i].start_time >= currentTimeStr) {
-            nextSchedule = predefinedSchedules[i];
-            break;
-        }
-    }
-
-    if (nextSchedule) {
-        bus.metadata.nextStop = nextSchedule.route_name;
-    } else {
-        bus.metadata.nextStop = 'หมดรอบวิ่ง';
+    // ── ขั้นตอนที่ 1: สร้าง ordered stop list จาก BUS_STOPS_SEQUENCE + พิกัดจาก DB ──
+    const orderedStops = buildOrderedStops();
+    if (orderedStops.length === 0) {
+        bus.metadata.nextStop = 'รอข้อมูลป้ายรถ';
         bus.metadata.eta = '-';
         return;
     }
 
-    // Calculate ETA based on speed and distance to the target stop
     const currentPos = bus.position;
-    const speedKmh = bus.metadata.speed || 0; // fallback to 0
-    
-    // Find the corresponding coordinates for the next schedule stop
-    let targetStop = busStopCoordinates.find(stop => stop.name === bus.metadata.nextStop);
-    
-    if (targetStop) {
-        const distanceToStop = calculateDistance(currentPos.lat, currentPos.lng, targetStop.lat, targetStop.lng);
-        
-        if (speedKmh > 5 && distanceToStop > 50) { // Only calculate if bus is moving and not right at the stop
-            // Convert km/h to m/s
-            const speedMs = speedKmh * (1000 / 3600);
-            const timeSeconds = distanceToStop / speedMs;
-            
-            if (timeSeconds < 60) {
-                bus.metadata.eta = '< 1 นาที';
-            } else {
-                const etaMinutes = Math.ceil(timeSeconds / 60);
-                bus.metadata.eta = `${etaMinutes} นาที`;
-            }
-        } else if (distanceToStop <= 50) {
-            bus.metadata.eta = 'กำลังถึงป้าย';
-        } else {
-            // Bus is stopped or moving very slow far from stop
-            bus.metadata.eta = 'กำลังคำนวณ...';
+    const speedKmh = bus.metadata.speed || 0;
+
+    // ── ขั้นตอนที่ 2: หาป้ายที่ใกล้รถที่สุด (nearest stop) ด้วย Haversine ──
+    let nearestIdx = 0;
+    let nearestDist = Infinity;
+    for (let i = 0; i < orderedStops.length; i++) {
+        const d = calculateDistance(currentPos.lat, currentPos.lng, orderedStops[i].lat, orderedStops[i].lng);
+        if (d < nearestDist) {
+            nearestDist = d;
+            nearestIdx = i;
         }
-    } else {
-        bus.metadata.eta = 'กำลังคำนวณ...';
     }
+
+    // ── ขั้นตอนที่ 3: กำหนดป้ายถัดไป ──
+    let nextStopIdx;
+    if (nearestDist <= AT_STOP_THRESHOLD_M) {
+        // รถอยู่ที่ป้ายแล้ว → ป้ายถัดไปคือตัวถัดไปในเส้นทาง
+        nextStopIdx = nearestIdx + 1;
+    } else {
+        // รถอยู่ระหว่างทาง → ป้ายถัดไปคือป้ายที่ใกล้ที่สุดข้างหน้า
+        // ตรวจสอบว่ารถผ่านป้ายใกล้ที่สุดไปแล้วหรือยัง
+        if (nearestIdx + 1 < orderedStops.length) {
+            const distToNext = calculateDistance(currentPos.lat, currentPos.lng, orderedStops[nearestIdx + 1].lat, orderedStops[nearestIdx + 1].lng);
+            const distNearestToNext = calculateDistance(orderedStops[nearestIdx].lat, orderedStops[nearestIdx].lng, orderedStops[nearestIdx + 1].lat, orderedStops[nearestIdx + 1].lng);
+            // ถ้ารถอยู่ใกล้ป้ายถัดไปมากกว่าระยะระหว่างป้ายปัจจุบันกับถัดไป → ยังไม่ผ่าน
+            if (distToNext < distNearestToNext) {
+                nextStopIdx = nearestIdx + 1;
+            } else {
+                nextStopIdx = nearestIdx;
+            }
+        } else {
+            nextStopIdx = nearestIdx;
+        }
+    }
+
+    // ตรวจสอบว่าเลยป้ายสุดท้ายหรือยัง
+    if (nextStopIdx >= orderedStops.length) {
+        bus.metadata.nextStop = 'ครบรอบแล้ว';
+        bus.metadata.eta = '-';
+        return;
+    }
+
+    const nextStop = orderedStops[nextStopIdx];
+    bus.metadata.nextStop = nextStop.name;
+
+    // ── ขั้นตอนที่ 4: คำนวณระยะทางตามเส้นทาง (route distance) ──
+    // ระยะจาก bus → ป้าย nearest → ... → ป้าย nextStop
+    let routeDistanceM = 0;
+
+    if (nextStopIdx === nearestIdx) {
+        // รถมุ่งไปป้ายเดียวกับที่ใกล้ที่สุด
+        routeDistanceM = nearestDist;
+    } else {
+        // ระยะจากรถถึงป้าย nearest
+        routeDistanceM = nearestDist;
+        // รวมระยะ segment ระหว่างป้าย
+        for (let i = nearestIdx; i < nextStopIdx; i++) {
+            routeDistanceM += calculateDistance(
+                orderedStops[i].lat, orderedStops[i].lng,
+                orderedStops[i + 1].lat, orderedStops[i + 1].lng
+            );
+        }
+    }
+
+    // คูณ road factor เพราะเส้นทางจริงไม่ใช่เส้นตรง
+    routeDistanceM *= ROAD_FACTOR;
+
+    // ── ขั้นตอนที่ 5: คำนวณ ETA ด้วยสูตร ──
+    // ETA = เวลาปัจจุบัน + (ระยะทาง ÷ ความเร็วเฉลี่ย)
+    if (routeDistanceM <= AT_STOP_THRESHOLD_M) {
+        bus.metadata.eta = 'กำลังถึงป้าย';
+        return;
+    }
+
+    // ใช้ speed จาก GPS ถ้ากำลังเคลื่อนที่, ถ้าไม่ใช้ fallback
+    const avgSpeedKmh = (speedKmh > MOVING_THRESHOLD_KMH) ? speedKmh : FALLBACK_SPEED_KMH;
+    const avgSpeedMs = avgSpeedKmh * (1000 / 3600); // แปลงเป็น m/s
+    const etaSeconds = routeDistanceM / avgSpeedMs;
+
+    // คำนวณเวลาถึงจริง (absolute)
+    const now = new Date();
+    const arrivalTime = new Date(now.getTime() + etaSeconds * 1000);
+    const arrivalHH = arrivalTime.getHours().toString().padStart(2, '0');
+    const arrivalMM = arrivalTime.getMinutes().toString().padStart(2, '0');
+
+    // ── ขั้นตอนที่ 6: แสดงผล ETA ──
+    if (etaSeconds < 60) {
+        bus.metadata.eta = `< 1 นาที (ถึง ~${arrivalHH}:${arrivalMM} น.)`;
+    } else {
+        const etaMinutes = Math.ceil(etaSeconds / 60);
+        bus.metadata.eta = `~${etaMinutes} นาที (ถึง ~${arrivalHH}:${arrivalMM} น.)`;
+    }
+
+    // แสดง source ของความเร็วใน console สำหรับ debug
+    if (speedKmh <= MOVING_THRESHOLD_KMH) {
+        console.log(`[ETA] ${busId}: ใช้ fallback speed ${FALLBACK_SPEED_KMH} km/h (รถหยุด/ช้ามาก)`);
+    }
+}
+
+// ─── Build Ordered Stops with Coordinates ─────────────────────────────────────
+// จับคู่ BUS_STOPS_SEQUENCE กับพิกัด GPS จาก busStopCoordinates (Firestore locations)
+function buildOrderedStops() {
+    if (busStopCoordinates.length === 0) return [];
+
+    const result = [];
+    for (const seqStop of BUS_STOPS_SEQUENCE) {
+        // หาพิกัดจาก Firestore locations โดย fuzzy match ชื่อ
+        const matched = busStopCoordinates.find(coord =>
+            coord.name === seqStop.name ||
+            coord.name.includes(seqStop.name) ||
+            seqStop.name.includes(coord.name) ||
+            coord.id === seqStop.id
+        );
+        if (matched) {
+            result.push({
+                id: seqStop.id,
+                name: seqStop.name,
+                lat: matched.lat,
+                lng: matched.lng
+            });
+        }
+    }
+
+    // ถ้า match ไม่ได้เลย ใช้ busStopCoordinates ตามลำดับเดิม
+    if (result.length === 0) {
+        return busStopCoordinates.map(c => ({ id: c.id, name: c.name, lat: c.lat, lng: c.lng }));
+    }
+
+    return result;
 }
 
 function createBusCardHtml(id, driverName, driverPhone, plate, status, nextStop, eta) {
@@ -474,12 +568,12 @@ function createBusCardHtml(id, driverName, driverPhone, plate, status, nextStop,
             <!-- Middle Row with ETA & Next Stop -->
             <div class="mt-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 flex items-center justify-between text-sm">
                 <div class="flex flex-col">
-                    <span class="text-xs text-gray-500 dark:text-gray-400 mb-0.5">รอประมาณ</span>
-                    <span class="text-orange-500 font-bold text-base leading-none">${printEta}</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 mb-0.5">เวลาถึงโดยประมาณ</span>
+                    <span class="text-orange-500 font-bold text-sm leading-tight">${printEta}</span>
                 </div>
                 <div class="flex flex-col items-end text-right">
                     <span class="text-xs text-gray-500 dark:text-gray-400 mb-0.5">มุ่งหน้าสถานี</span>
-                    <span class="text-gray-800 dark:text-gray-200 font-bold leading-none truncate max-w-[120px]">${nextStop}</span>
+                    <span class="text-gray-800 dark:text-gray-200 font-bold leading-none truncate max-w-[140px]">${nextStop}</span>
                 </div>
             </div>
             
