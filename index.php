@@ -152,6 +152,64 @@ $isDarkMode = ($theme === 'dark');
     </script>
 </head>
 <body class="bg-darkbg text-white font-sans antialiased">
+    
+    <!-- Global Page Loader Overlay -->
+    <div id="global-page-loader" class="fixed inset-0 z-[9999] flex items-center justify-center bg-darkbg transition-opacity duration-300">
+        <div class="text-center animate-fade-in-up">
+            <div class="relative w-20 h-20 mx-auto mb-6">
+                <!-- Outer ring -->
+                <div class="absolute inset-0 border-4 border-gray-700/30 rounded-full"></div>
+                <!-- Spinning ring -->
+                <div class="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
+                <!-- Center Icon -->
+                <svg class="absolute inset-0 w-8 h-8 m-auto text-primary animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-100 mb-2 tracking-wide">กำลังเตรียมข้อมูล...</h2>
+            <p class="text-sm text-gray-400">กรุณารอสักครู่ ระบบกำลังประมวลผล</p>
+        </div>
+    </div>
+    
+    <script>
+        // Handle global page loader transitions
+        window.addEventListener('load', function() {
+            const loader = document.getElementById('global-page-loader');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                }, 300);
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const navLinks = document.querySelectorAll('a[href^="?page="], a[href^="index.php"]');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    if (e.ctrlKey || e.metaKey || this.target === '_blank') return;
+                    
+                    const loader = document.getElementById('global-page-loader');
+                    if (loader) {
+                        loader.style.display = 'flex';
+                        // Force reflow
+                        void loader.offsetWidth;
+                        loader.style.opacity = '1';
+                    }
+                });
+            });
+            
+            // Fallback timeout
+            setTimeout(() => {
+                const loader = document.getElementById('global-page-loader');
+                if (loader && loader.style.display !== 'none') {
+                    loader.style.opacity = '0';
+                    setTimeout(() => { loader.style.display = 'none'; }, 300);
+                }
+            }, 10000);
+        });
+    </script>
+
     <!-- Sidebar Overlay (mobile) -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-40 hidden transition-opacity lg:hidden" onclick="toggleSidebar()"></div>
 

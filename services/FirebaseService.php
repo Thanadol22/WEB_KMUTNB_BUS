@@ -10,6 +10,19 @@ class FirebaseService {
     }
 
     /**
+     * Get a single document via REST
+     */
+    public function getDocument($collection, $uid) {
+        try {
+            $response = $this->client->get($collection . '/' . $uid);
+            $body = json_decode($response->getBody(), true);
+            return $this->parseFirestoreDocument($body);
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * Get a collection via REST
      */
     public function getAllDocuments($collectionName) {

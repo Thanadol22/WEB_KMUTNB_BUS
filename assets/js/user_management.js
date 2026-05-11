@@ -112,6 +112,19 @@ loadUsers();
 
 async function loadUsers() {
     const tbody = document.getElementById('user-table-body');
+    
+    // Show Loading Skeleton
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6" class="px-6 py-8">
+                <div class="flex flex-col items-center justify-center space-y-4">
+                    <div class="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <span class="text-sm text-gray-500 font-medium animate-pulse">กำลังโหลดข้อมูลผู้ใช้งาน...</span>
+                </div>
+            </td>
+        </tr>
+    `;
+
     try {
         const res = await fetch('services/user_api.php?action=list');
         
