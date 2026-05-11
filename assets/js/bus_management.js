@@ -244,8 +244,11 @@ function renderBuses() {
                     <circle cx="18" cy="18" r="16" fill="none" class="${batteryColor.replace('text-', 'stroke-')} transition-all duration-700" 
                         stroke-width="3" stroke-dasharray="${bus.batteryPercent}, 100" stroke-linecap="round"></circle>
                 </svg>
-                <div class="absolute inset-0 flex flex-col items-center justify-center">
-                    <span class="text-[13px] font-black text-gray-800">${bus.batteryPercent}%</span>
+                <div class="absolute inset-0 flex flex-col items-center justify-center -space-y-0.5">
+                    <svg class="w-4 h-4 ${batteryColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        ${batteryIcon}
+                    </svg>
+                    <span class="text-[11px] font-black text-gray-800">${bus.batteryPercent}%</span>
                 </div>
             </div>`
             : `
@@ -258,7 +261,9 @@ function renderBuses() {
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center space-x-3">
                         <div class="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-sm">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                            <svg class="w-6 h-6  ${iconTextColor}" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M4 16c0 .88.39 1.67 1 2.22v1.28c0 .83.67 1.5 1.5 1.5S8 20.33 8 19.5V19h8v.5c0 .82.67 1.5 1.5 1.5.82 0 1.5-.68 1.5-1.5v-1.28c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z" />
+                            </svg>
                         </div>
                         <div>
                             <h3 class="text-lg font-black text-gray-900 leading-tight">${bus.plateNumber}</h3>
