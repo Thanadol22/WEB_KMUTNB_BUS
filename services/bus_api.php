@@ -36,6 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($data['capacity'])) $docData['capacity'] = $data['capacity'];
             if (isset($data['status'])) $docData['status'] = $data['status'];
             if (isset($data['is_active'])) $docData['is_active'] = (bool)$data['is_active'];
+            if (isset($data['bus_brand'])) $docData['bus_brand'] = $data['bus_brand'];
+            if (isset($data['bus_type'])) $docData['bus_type'] = $data['bus_type'];
+            if (isset($data['bus_seats'])) $docData['bus_seats'] = (int)$data['bus_seats'];
 
             $firebaseService->saveDocument('buses', $busId, $docData);
             echo json_encode(['status' => 'success', 'message' => 'Bus updated successfully']);

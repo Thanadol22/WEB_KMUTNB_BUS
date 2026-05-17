@@ -46,7 +46,10 @@ function setupFormListener() {
             license_plate: document.getElementById('license_plate').value,
             driver_id: document.getElementById('driver_id').value,
             status: document.getElementById('status').value,
-            is_active: document.getElementById('is_active').checked
+            is_active: document.getElementById('is_active').checked,
+            bus_brand: document.getElementById('bus_brand').value,
+            bus_type: document.getElementById('bus_type').value,
+            bus_seats: document.getElementById('bus_seats').value
         };
 
         submitBtn.disabled = true;
@@ -83,6 +86,9 @@ window.openEditModal = (busId) => {
     document.getElementById('driver_id').value = bus.driverId || '';
     document.getElementById('status').value = (bus.status === 'กำลังให้บริการ' || bus.status === 'พร้อมให้บริการ' || bus.status === 'active') ? 'active' : bus.status;
     document.getElementById('is_active').checked = bus.isActive;
+    document.getElementById('bus_brand').value = bus.busBrand || '';
+    document.getElementById('bus_type').value = bus.busType || '';
+    document.getElementById('bus_seats').value = bus.busSeats || '';
 
     busModal.classList.remove('hidden');
 };
@@ -136,6 +142,9 @@ function startBusManagement() {
                 status: data.status || "unknown",
                 isActive: data.is_active || false,
                 capacity: data.capacity || "-",
+                busBrand: data.bus_brand || "-",
+                busType: data.bus_type || "-",
+                busSeats: data.bus_seats || "-"
             };
 
             // Attach RTDB listener for battery
@@ -274,6 +283,18 @@ function renderBuses() {
                         </div>
                     </div>
                     ${batteryDisplay}
+                </div>
+                
+                <div class="mb-4 text-xs flex flex-wrap gap-2 text-gray-500">
+                    <div class="px-2 py-1 rounded bg-gray-100 border border-gray-200">
+                        <span class="font-semibold text-gray-600">ยี่ห้อ:</span> ${bus.busBrand}
+                    </div>
+                    <div class="px-2 py-1 rounded bg-gray-100 border border-gray-200">
+                        <span class="font-semibold text-gray-600">ประเภท:</span> ${bus.busType}
+                    </div>
+                    <div class="px-2 py-1 rounded bg-gray-100 border border-gray-200">
+                        <span class="font-semibold text-gray-600">ที่นั่ง:</span> ${bus.busSeats}
+                    </div>
                 </div>
                 
                 <div class="space-y-3 mb-6 bg-gray-50/50 p-4 rounded-2xl">

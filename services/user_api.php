@@ -5,6 +5,7 @@ require_once 'FirebaseService.php';
 header('Content-Type: application/json');
 
 // Initialize Service with REST client
+/** @var array $firebase Defined in includes/firebase_config.php */
 $firebaseService = new FirebaseService($firebase['db']);
 
 $action = $_GET['action'] ?? '';
@@ -40,6 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'fcm_token' => '',
                 'created_at' => date('F j, Y \a\t g:i:s A \U\T\C\+7') // E.g., "March 31, 2026 at 2:09:10 PM UTC+7"
             ];
+            
+            if (isset($data['gender'])) $docData['gender'] = $data['gender'];
+            if (isset($data['date_of_birth'])) $docData['date_of_birth'] = $data['date_of_birth'];
+            if (isset($data['profile_image_url'])) $docData['profile_image_url'] = $data['profile_image_url'];
             
             $firebaseService->saveDocument('users', $uid, $docData);
             
@@ -95,10 +100,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 if (isset($existingData['created_at'])) $docData['created_at'] = $existingData['created_at'];
                 if (isset($existingData['fcm_token'])) $docData['fcm_token'] = $existingData['fcm_token'];
+                if (!isset($data['gender']) && isset($existingData['gender'])) $docData['gender'] = $existingData['gender'];
+                if (!isset($data['date_of_birth']) && isset($existingData['date_of_birth'])) $docData['date_of_birth'] = $existingData['date_of_birth'];
+                if (!isset($data['profile_image_url']) && isset($existingData['profile_image_url'])) $docData['profile_image_url'] = $existingData['profile_image_url'];
             } catch (Exception $e) {
                 // If it fails to fetch (e.g., doesn't exist), we just proceed
                 $docData['created_at'] = date('F j, Y \a\t g:i:s A \U\T\C\+7');
             }
+
+            if (isset($data['gender'])) $docData['gender'] = $data['gender'];
+            if (isset($data['date_of_birth'])) $docData['date_of_birth'] = $data['date_of_birth'];
+            if (isset($data['profile_image_url'])) $docData['profile_image_url'] = $data['profile_image_url'];
 
             $firebaseService->saveDocument('users', $uid, $docData);
             

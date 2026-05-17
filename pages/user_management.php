@@ -14,7 +14,7 @@
     <div class="flex space-x-2" id="filter-container">
         <button data-role="all" class="filter-btn px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-600 hover:bg-gray-700 active-filter">ทั้งหมด</button>
         <button data-role="student" class="filter-btn px-4 py-2 rounded-lg bg-transparent text-gray-400 border border-transparent hover:bg-gray-800">นักศึกษา</button>
-        <button data-role="driver" class="filter-btn px-4 py-2 rounded-lg bg-transparent text-gray-400 border border-transparent hover:bg-gray-800">พนักงานขับรถ</button>
+        <button data-role="admin" class="filter-btn px-4 py-2 rounded-lg bg-transparent text-gray-400 border border-transparent hover:bg-gray-800">ผู้ดูแลระบบ</button>
     </div>
     <div class="relative w-full md:w-64">
         <input type="text" id="searchInput" placeholder="ค้นหาชื่อ, รหัสนักศึกษา..." class="w-full bg-darkbg border border-gray-700 text-white rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors">
@@ -31,7 +31,6 @@
                     <th scope="col" class="px-6 py-4">ชื่อ - นามสกุล</th>
                     <th scope="col" class="px-6 py-4">ชื่อผู้ใช้งาน</th>
                     <th scope="col" class="px-6 py-4">บทบาท</th>
-                    <th scope="col" class="px-6 py-4">เบอร์โทรศัพท์</th>
                     <th scope="col" class="px-6 py-4">สถานะ</th>
                     <th scope="col" class="px-6 py-4 text-center">จัดการ</th>
                 </tr>
@@ -65,7 +64,6 @@
             <div>
                 <label class="block text-sm font-medium text-gray-400 mb-1">บทบาท <span class="text-red-500">*</span></label>
                 <select id="userRole" name="role" class="w-full bg-darkbg border border-gray-700 text-white rounded-lg px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none" required>
-                    <option value="driver">พนักงานขับรถ (Driver)</option>
                     <option value="student">นักศึกษา (Student)</option>
                     <option value="admin">ผู้ดูแลระบบ (Admin)</option>
                 </select>
@@ -81,11 +79,6 @@
                 <input type="text" id="userUsername" name="username" required class="w-full bg-darkbg border border-gray-700 text-white rounded-lg px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="เช่น 111111">
             </div>
             
-            <div>
-                <label class="block text-sm font-medium text-gray-400 mb-1">เบอร์โทรศัพท์</label>
-                <input type="tel" id="userPhone" name="phone" class="w-full bg-darkbg border border-gray-700 text-white rounded-lg px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="เช่น 0860542759">
-            </div>
-
             <div>
                 <label class="block text-sm font-medium text-gray-400 mb-1">รหัสผ่าน <span class="text-red-500">*</span> <span class="text-xs text-gray-500" id="pwdHint"></span></label>
                 <input type="text" id="userPassword" name="password" required class="w-full bg-darkbg border border-gray-700 text-white rounded-lg px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="เช่น 111111">

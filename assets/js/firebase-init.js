@@ -4,15 +4,12 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/9.23.0/firebase
 import { getDatabase } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
-// Load config from window object (Injected by PHP)
-const firebaseConfig = window.firebaseConfig || {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+// Load config from window object (Injected by PHP in index.php)
+const firebaseConfig = window.firebaseConfig || {};
+
+if (!firebaseConfig.apiKey) {
+  console.error("Firebase Web Config is missing! Check your .env file and includes/firebase_config.php");
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

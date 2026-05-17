@@ -45,6 +45,18 @@ date_default_timezone_set("Asia/Bangkok");
                     </select>
                 </div>
                 <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">ยี่ห้อรถ (Bus Brand)</label>
+                    <input type="text" id="bus_brand" class="w-full bg-darkbg border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-primary transition-all" placeholder="เช่น Toyota">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">ประเภทรถ (Bus Type)</label>
+                    <input type="text" id="bus_type" class="w-full bg-darkbg border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-primary transition-all" placeholder="เช่น รถสองแถว">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">จำนวนที่นั่ง (Bus Seats)</label>
+                    <input type="number" id="bus_seats" class="w-full bg-darkbg border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-primary transition-all" placeholder="เช่น 14">
+                </div>
+                <div>
                     <label class="block text-sm font-medium text-gray-400 mb-1">สถานะ</label>
                     <select id="status" class="w-full bg-darkbg border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-primary transition-all">
                         <option value="active">พร้อมให้บริการ</option>
