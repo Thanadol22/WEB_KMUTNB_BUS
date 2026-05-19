@@ -309,7 +309,7 @@ function updateBusMarker(id, lat, lng, plate, status, nextStop, eta) {
 
     if (!lat || !lng) return;
 
-    const isActive = status === 'active' || status === 'พร้อมให้บริการ';
+    const isActive = status === 'active' || status === 'พร้อมให้บริการ' || status === 'พร้อมบริการ' || status === 'กำลังให้บริการ';
     
     // Bus Icon
     const busIconColor = isActive ? 'bg-green-500' : 'bg-gray-500';
@@ -530,7 +530,7 @@ function buildOrderedStops() {
 }
 
 function createBusCardHtml(id, driverName, driverPhone, plate, status, nextStop, eta) {
-    const isActive = status === 'active' || status === 'พร้อมให้บริการ' || status === 'กำลังให้บริการ';
+    const isActive = status === 'active' || status === 'พร้อมให้บริการ' || status === 'พร้อมบริการ' || status === 'กำลังให้บริการ';
     
     const borderColor = isActive ? 'border-green-500' : 'border-gray-600';
     const badgeColor = isActive ? 'bg-green-100 text-green-700' : 'bg-gray-700 text-gray-300';

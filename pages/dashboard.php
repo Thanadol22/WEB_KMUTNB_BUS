@@ -1,4 +1,7 @@
 <?php
+global $firebase;
+global $firebaseService;
+
 // PHP logic for dashboard counts
 $users = $firebaseService->getAllDocuments('users');
 $totalUsers = count($users);
@@ -223,7 +226,7 @@ foreach ($buses as $bus) {
             if (!activeBusesCountEl) return;
             let total = 0;
             for (let b of Object.values(busesStateCount)) {
-                const isActiveStatus = (b.fsStatus === 'กำลังให้บริการ' || b.fsStatus === 'active' || b.fsStatus === 'running');
+                const isActiveStatus = (b.fsStatus === 'กำลังให้บริการ' || b.fsStatus === 'พร้อมให้บริการ' || b.fsStatus === 'พร้อมบริการ' || b.fsStatus === 'active' || b.fsStatus === 'running');
                 // The bus is "active" if it has tracking locations actively sending, OR its status is explicitly marked active
                 if (b.hasRtdbData || isActiveStatus) {
                     total++;

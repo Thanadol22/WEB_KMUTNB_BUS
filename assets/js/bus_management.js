@@ -84,7 +84,7 @@ window.openEditModal = (busId) => {
     document.getElementById('bus_id_hidden').value = busId;
     document.getElementById('license_plate').value = bus.plateNumber;
     document.getElementById('driver_id').value = bus.driverId || '';
-    document.getElementById('status').value = (bus.status === 'กำลังให้บริการ' || bus.status === 'พร้อมให้บริการ' || bus.status === 'active') ? 'active' : bus.status;
+    document.getElementById('status').value = (bus.status === 'กำลังให้บริการ' || bus.status === 'พร้อมให้บริการ' || bus.status === 'พร้อมบริการ' || bus.status === 'active') ? 'active' : bus.status;
     document.getElementById('is_active').checked = bus.isActive;
     document.getElementById('bus_brand').value = bus.busBrand || '';
     document.getElementById('bus_type').value = bus.busType || '';
@@ -206,7 +206,7 @@ function renderBuses() {
 
     for (const [id, bus] of Object.entries(busesState)) {
         let statusBadge = '';
-        if (bus.status === 'active' || bus.status === 'กำลังให้บริการ' || bus.status === 'พร้อมให้บริการ' || bus.isActive) {
+        if (bus.status === 'active' || bus.status === 'กำลังให้บริการ' || bus.status === 'พร้อมให้บริการ' || bus.status === 'พร้อมบริการ' || bus.isActive) {
             statusBadge = '<span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-700">กำลังวิ่ง</span>';
         } else if (bus.status === 'maintenance' || bus.status === 'ซ่อมบำรุง') {
             statusBadge = '<span class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full border border-red-700">ซ่อมบำรุง</span>';
