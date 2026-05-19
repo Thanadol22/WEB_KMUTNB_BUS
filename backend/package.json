@@ -1,0 +1,13 @@
+{
+  "name": "kmutnb-bus-geofencing",
+  "version": "1.0.0",
+  "description": "Geofencing daemon for KMUTNB Bus",
+  "main": "daemon.js",
+  "scripts": {
+    "start": "node daemon.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^12.1.0"
+  }
+}
