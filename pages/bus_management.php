@@ -59,9 +59,10 @@ date_default_timezone_set("Asia/Bangkok");
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-1">สถานะ</label>
                     <select id="status" class="w-full bg-darkbg border border-gray-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-primary transition-all">
-                        <option value="active">พร้อมให้บริการ</option>
-                        <option value="maintenance">ซ่อมบำรุง</option>
-                        <option value="inactive">หยุดให้บริการ</option>
+                        <option value="พร้อมบริการ">พร้อมบริการ</option>
+                        <option value="หยุดบริการ">หยุดบริการ</option>
+                        <option value="ซ่อมบำรุง">ซ่อมบำรุง</option>
+                        <option value="เติมน้ำมัน">เติมน้ำมัน</option>
                     </select>
                 </div>
                 <div class="flex items-center space-x-2 pt-2">

@@ -8,35 +8,72 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
     exit();
 }
 
+// --- CSRF Token ---
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// --- Rate Limiting (session-based) ---
+$maxAttempts = 5;
+$lockoutMinutes = 15;
+$now = time();
+
+if (!isset($_SESSION['login_attempts'])) {
+    $_SESSION['login_attempts'] = [];
+}
+
+// Clean old attempts
+$_SESSION['login_attempts'] = array_filter($_SESSION['login_attempts'], function ($ts) use ($now, $lockoutMinutes) {
+    return ($now - $ts) < ($lockoutMinutes * 60);
+});
+
+$isLocked = count($_SESSION['login_attempts']) >= $maxAttempts;
+
 $error = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
-    
-    $firebaseService = new FirebaseService($firebase['db']);
-    $users = $firebaseService->getAllDocuments('users');
-    
-    $isAuthenticated = false;
-    foreach ($users as $user) {
-        if (isset($user['username']) && $user['username'] === $username && 
-            isset($user['password']) && $user['password'] === $password) {
-            
-            if (isset($user['role']) && $user['role'] === 'admin') {
-                $isAuthenticated = true;
-                $_SESSION['admin_logged_in'] = true;
-                $_SESSION['admin_user'] = $user;
-                header("Location: index.php");
-                exit();
-            } else {
-                $error = 'ไม่มีสิทธิ์เข้าถึง (อนุญาตเฉพาะ Admin)';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isLocked) {
+    // Validate CSRF
+    $token = $_POST['csrf_token'] ?? '';
+    if (!hash_equals($_SESSION['csrf_token'], $token)) {
+        $error = 'Invalid request (CSRF token mismatch)';
+    } else {
+        $username = $_POST['username'] ?? '';
+        $password = $_POST['password'] ?? '';
+        
+        $firebaseService = new FirebaseService($firebase['db']);
+        $users = $firebaseService->getAllDocuments('users');
+        
+        $isAuthenticated = false;
+        foreach ($users as $user) {
+            if (isset($user['username']) && $user['username'] === $username && 
+                isset($user['password']) && $user['password'] === $password) {
+                
+                if (isset($user['role']) && $user['role'] === 'admin') {
+                    $isAuthenticated = true;
+                    $_SESSION['admin_logged_in'] = true;
+                    $_SESSION['admin_user'] = $user;
+                    // Clear attempts on success
+                    $_SESSION['login_attempts'] = [];
+                    header("Location: index.php");
+                    exit();
+                } else {
+                    $error = 'ไม่มีสิทธิ์เข้าถึง (อนุญาตเฉพาะ Admin)';
+                }
+                break;
             }
-            break;
+        }
+        
+        if (!$isAuthenticated && empty($error)) {
+            $error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+        }
+        
+        // Record failed attempt
+        if (!$isAuthenticated) {
+            $_SESSION['login_attempts'][] = $now;
         }
     }
     
-    if (!$isAuthenticated && empty($error)) {
-        $error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
-    }
+    // Regenerate CSRF token after each POST
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 ?>
 <!DOCTYPE html>
@@ -84,22 +121,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p class="text-gray-400 mt-2">กรุณาเข้าสู่ระบบเพื่อจัดการข้อมูล</p>
         </div>
         
-        <?php if ($error): ?>
+        <?php if ($isLocked): ?>
+            <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6 text-sm">
+                ล็อกอินผิดเกิน <?php echo $maxAttempts; ?> ครั้ง กรุณารอ <?php echo $lockoutMinutes; ?> นาที
+            </div>
+        <?php elseif ($error): ?>
             <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6 text-sm">
                 <?php echo htmlspecialchars($error); ?>
             </div>
         <?php endif; ?>
 
         <form method="POST" action="">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
             <div class="mb-4">
                 <label class="block text-gray-400 text-sm mb-2" for="username">ชื่อผู้ใช้งาน</label>
-                <input class="w-full bg-darkbg border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary" type="text" id="username" name="username" required>
+                <input class="w-full bg-darkbg border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary" type="text" id="username" name="username" required <?php echo $isLocked ? 'disabled' : ''; ?>>
             </div>
             <div class="mb-6">
                 <label class="block text-gray-400 text-sm mb-2" for="password">รหัสผ่าน</label>
-                <input class="w-full bg-darkbg border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary" type="password" id="password" name="password" required>
+                <input class="w-full bg-darkbg border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary" type="password" id="password" name="password" required <?php echo $isLocked ? 'disabled' : ''; ?>>
             </div>
-            <button class="w-full bg-primary hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors" type="submit">
+            <button class="w-full bg-primary hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors <?php echo $isLocked ? 'opacity-50 cursor-not-allowed' : ''; ?>" type="submit" <?php echo $isLocked ? 'disabled' : ''; ?>>
                 เข้าสู่ระบบ
             </button>
         </form>

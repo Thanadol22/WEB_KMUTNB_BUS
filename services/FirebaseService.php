@@ -2,11 +2,9 @@
 
 class FirebaseService {
     protected $client;
-    protected $auth;
 
-    public function __construct($client, $auth = null) {
+    public function __construct($client) {
         $this->client = $client;
-        $this->auth = $auth;
     }
 
     /**

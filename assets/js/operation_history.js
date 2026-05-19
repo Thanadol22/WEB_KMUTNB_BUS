@@ -1,4 +1,4 @@
-import { app, db } from "./firebase-init.js";
+import { db } from "./firebase-init.js";
 import {
     collection, onSnapshot, query as fsQuery, orderBy, where, getDocs
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";

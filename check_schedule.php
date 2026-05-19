@@ -1,40 +1,46 @@
 <?php
+/**
+ * Schedule Checker — Sends FCM push notifications to drivers
+ * 15 minutes before their scheduled bus round.
+ * 
+ * Uses shared Firebase services instead of manual JWT/REST.
+ * Designed to be called via cron job every minute.
+ */
 date_default_timezone_set('Asia/Bangkok');
-require_once __DIR__ . '/vendor/autoload.php';
-
-use Firebase\JWT\JWT;
+require_once __DIR__ . '/includes/firebase_config.php';
+require_once __DIR__ . '/services/FirebaseService.php';
 
 header('Content-Type: application/json');
 
-// === 1. โหลด Service Account จาก .env ===
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
-$dotenv->safeLoad();
-
-$projectId = $_ENV['FIREBASE_PROJECT_ID'] ?? getenv('FIREBASE_PROJECT_ID');
-$clientEmail = $_ENV['FIREBASE_CLIENT_EMAIL'] ?? getenv('FIREBASE_CLIENT_EMAIL');
-$privateKey = $_ENV['FIREBASE_PRIVATE_KEY'] ?? getenv('FIREBASE_PRIVATE_KEY');
-
-if (!$projectId || !$clientEmail || !$privateKey) {
-    die(json_encode(['status' => 'error', 'message' => 'Firebase credentials not found in .env / Environment Variables.']));
+/** @var array $firebase Defined in includes/firebase_config.php */
+if ($firebase['status'] !== 'connected' || !$firebase['db']) {
+    die(json_encode(['status' => 'error', 'message' => 'Firebase connection not available.']));
 }
 
-$serviceAccount = [
-    'project_id' => $projectId,
-    'client_email' => $clientEmail,
-    'private_key' => str_replace('\\n', "\n", $privateKey)
-];
+$firebaseService = new FirebaseService($firebase['db']);
 
-// === 2. สร้าง Access Token (JWT → OAuth2) ===
-function getAccessToken($serviceAccount) {
+// --- Get Access Token for FCM (still needed for FCM HTTP v1 API) ---
+$projectId = $_ENV['FIREBASE_PROJECT_ID'] ?? '';
+$clientEmail = $_ENV['FIREBASE_CLIENT_EMAIL'] ?? '';
+$privateKey = $_ENV['FIREBASE_PRIVATE_KEY'] ?? '';
+
+if (!$projectId || !$clientEmail || !$privateKey) {
+    die(json_encode(['status' => 'error', 'message' => 'Firebase credentials not found.']));
+}
+
+// Use firebase/php-jwt for access token
+use Firebase\JWT\JWT;
+
+function getAccessToken($clientEmail, $privateKey) {
     $now = time();
     $payload = [
-        'iss' => $serviceAccount['client_email'],
-        'scope' => 'https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/datastore',
+        'iss' => $clientEmail,
+        'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
         'aud' => 'https://oauth2.googleapis.com/token',
         'iat' => $now,
         'exp' => $now + 3600,
     ];
-    $jwt = JWT::encode($payload, $serviceAccount['private_key'], 'RS256');
+    $jwt = JWT::encode($payload, str_replace('\\n', "\n", $privateKey), 'RS256');
     
     $ch = curl_init('https://oauth2.googleapis.com/token');
     curl_setopt($ch, CURLOPT_POST, true);
@@ -49,72 +55,12 @@ function getAccessToken($serviceAccount) {
     return $response['access_token'] ?? null;
 }
 
-$accessToken = getAccessToken($serviceAccount);
+$accessToken = getAccessToken($clientEmail, $privateKey);
 if (!$accessToken) {
     die(json_encode(['status' => 'error', 'message' => 'Failed to obtain access token.']));
 }
 
-// === 3. ดึงข้อมูล Schedules จาก Firestore ===
-function getSchedules($projectId, $accessToken) {
-    $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/schedules";
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer {$accessToken}"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $response = json_decode(curl_exec($ch), true);
-    curl_close($ch);
-    return $response['documents'] ?? [];
-}
-
-// === ค้นหา Driver ID จาก Bus ID ในคอลเล็กชั่น buses ===
-function getDriverIdByBusId($projectId, $accessToken, $busId) {
-    $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents:runQuery";
-    $query = [
-        'structuredQuery' => [
-            'from' => [['collectionId' => 'buses']],
-            'where' => [
-                'fieldFilter' => [
-                    'field' => ['fieldPath' => 'bus_id'],
-                    'op' => 'EQUAL',
-                    'value' => ['stringValue' => $busId]
-                ]
-            ],
-            'limit' => 1
-        ]
-    ];
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($query));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer {$accessToken}",
-        "Content-Type: application/json"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $response = json_decode(curl_exec($ch), true);
-    curl_close($ch);
-
-    if (!empty($response) && isset($response[0]['document']['fields']['driver_id']['stringValue'])) {
-        return $response[0]['document']['fields']['driver_id']['stringValue'];
-    }
-    return null;
-}
-
-// === ดึง FCM Token ของ User (คนขับ) ===
-function getUserFcmToken($projectId, $accessToken, $driverId) {
-    $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/users/{$driverId}";
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer {$accessToken}"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $response = json_decode(curl_exec($ch), true);
-    curl_close($ch);
-
-    return $response['fields']['fcm_token']['stringValue'] ?? null;
-}
-
-// === ส่ง Push Notification ผ่าน FCM HTTP v1 API ===
+// --- Send FCM Notification ---
 function sendFcmMessage($projectId, $accessToken, $fcmToken, $title, $body) {
     $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
     $payload = [
@@ -148,30 +94,39 @@ function sendFcmMessage($projectId, $accessToken, $fcmToken, $title, $body) {
     return $response;
 }
 
-// === 4. เปรียบเทียบเวลา ===
+// --- Main Logic: Check Schedules ---
 $now = time();
 $target_time_start = date('H:i', strtotime('+14 minutes', $now));
 $target_time_end = date('H:i', strtotime('+16 minutes', $now));
 
-$schedules = getSchedules($projectId, $accessToken);
+// Use shared service to get schedules
+$schedules = $firebaseService->getAllDocuments('schedules');
 $notifications_sent = 0;
 $log = [];
 
-foreach ($schedules as $doc) {
-    $fields = $doc['fields'] ?? [];
-    $startTime = $fields['start_time']['stringValue'] ?? '';
-    $endTime = $fields['end_time']['stringValue'] ?? '';
-    $busId = $fields['bus_id']['stringValue'] ?? '';
+foreach ($schedules as $schedule) {
+    $startTime = $schedule['start_time'] ?? '';
+    $endTime = $schedule['end_time'] ?? '';
+    $busId = $schedule['bus_id'] ?? '';
     
-    // ตรวจสอบว่าช่วงเวลาเริ่มรอบรถตรงกับอีก 14-16 นาทีข้างหน้าหรือไม่
+    // Check if start_time falls within 14-16 minutes from now
     if ($startTime >= $target_time_start && $startTime <= $target_time_end) {
         
-        // === 5. ค้นหาคนขับ ===
-        $driverId = getDriverIdByBusId($projectId, $accessToken, $busId);
+        // Find driver via buses collection using shared service
+        $buses = $firebaseService->getAllDocuments('buses');
+        $driverId = null;
+        foreach ($buses as $bus) {
+            if (($bus['bus_id'] ?? '') === $busId || ($bus['id'] ?? '') === $busId) {
+                $driverId = $bus['driver_id'] ?? null;
+                break;
+            }
+        }
+
         if ($driverId) {
-            $fcmToken = getUserFcmToken($projectId, $accessToken, $driverId);
+            $driver = $firebaseService->getDocument('users', $driverId);
+            $fcmToken = $driver['fcm_token'] ?? null;
+            
             if ($fcmToken) {
-                // === 6. ส่ง Push Notification ===
                 $title = "⏰ เตรียมตัวออกรถ!";
                 $body = "รถของคุณมีรอบวิ่งในอีก 15 นาที (รอบ {$startTime} - {$endTime})";
                 $result = sendFcmMessage($projectId, $accessToken, $fcmToken, $title, $body);
@@ -192,7 +147,6 @@ foreach ($schedules as $doc) {
     }
 }
 
-// === 7. บันทึก Log ===
 echo json_encode([
     'status' => 'success',
     'message' => 'Schedule check completed',
@@ -200,5 +154,3 @@ echo json_encode([
     'notifications_sent' => $notifications_sent,
     'log' => $log
 ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-
-?>

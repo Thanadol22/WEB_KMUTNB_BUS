@@ -21,15 +21,12 @@ foreach ($users as $user) {
 // Get active buses
 $buses = $firebaseService->getAllDocuments('buses');
 $activeBusesCount = 0;
+$activeStatuses = ['พร้อมบริการ', 'พร้อมให้บริการ', 'กำลังให้บริการ', 'active'];
 foreach ($buses as $bus) {
-    if (isset($bus['is_active']) && $bus['is_active'] === true) {
+    $status = $bus['status'] ?? '';
+    $isActive = $bus['is_active'] ?? false;
+    if ($isActive === true || in_array($status, $activeStatuses)) {
         $activeBusesCount++;
-    } elseif (isset($bus['status']) && $bus['status'] === 'active') {
-        $activeBusesCount++;
-    } else if (!isset($bus['is_active']) && !isset($bus['status'])) {
-        // If there's no explicit status, just counting them might be enough, but let's be safe.
-        // Usually, buses collection only has active buses, or they have a status flag.
-        $activeBusesCount++; 
     }
 }
 ?>
@@ -100,7 +97,7 @@ foreach ($buses as $bus) {
             <div class="p-3 rounded-lg bg-green-500/20 text-green-400 mr-4">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             </div>
-            <h3 class="text-gray-400 font-medium">กำลังให้บริการ</h3>
+            <h3 class="text-gray-400 font-medium">พร้อมบริการ</h3>
         </div>
         <div class="text-3xl font-bold" id="active-buses-count"><?php echo number_format($activeBusesCount); ?></div>
         <div class="text-sm text-green-400 mt-2">Live Tracking Active</div>
@@ -226,7 +223,8 @@ foreach ($buses as $bus) {
             if (!activeBusesCountEl) return;
             let total = 0;
             for (let b of Object.values(busesStateCount)) {
-                const isActiveStatus = (b.fsStatus === 'กำลังให้บริการ' || b.fsStatus === 'พร้อมให้บริการ' || b.fsStatus === 'พร้อมบริการ' || b.fsStatus === 'active' || b.fsStatus === 'running');
+                const activeStatuses = ['พร้อมบริการ', 'พร้อมให้บริการ', 'กำลังให้บริการ', 'active', 'running'];
+                const isActiveStatus = activeStatuses.includes(b.fsStatus);
                 // The bus is "active" if it has tracking locations actively sending, OR its status is explicitly marked active
                 if (b.hasRtdbData || isActiveStatus) {
                     total++;

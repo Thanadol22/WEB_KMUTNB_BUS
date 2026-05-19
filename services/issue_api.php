@@ -1,9 +1,11 @@
 <?php
+require_once '../includes/auth_guard.php';
 require_once '../includes/firebase_config.php';
 require_once 'FirebaseService.php';
 
 header('Content-Type: application/json');
 
+/** @var array $firebase Defined in includes/firebase_config.php */
 $firebaseService = new FirebaseService($firebase['db']);
 $action = $_GET['action'] ?? '';
 

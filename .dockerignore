@@ -3,7 +3,11 @@
 .dockerignore
 node_modules/
 vendor/
-projectkmutnbbus-firebase-adminsdk-fbsvc-f20b727ddf.json
-service-account.json
+*.md
+package-lock.json
+composer.lock
+config/*.json
 .env
-
+.env.*
+.vscode/
+.idea/

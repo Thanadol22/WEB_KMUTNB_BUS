@@ -32,8 +32,10 @@ const rtdb = admin.database();
 let locationsCache = {}; // { stopName: { lat, lng } }
 let schedulesCache = {}; // { roundId: [ { order, name, scheduleTime } ] }
 let lastArrivedCache = {}; // { busId_roundId: { lastStopName, timestamp } }
+let busScheduleMap = {}; // { busId: roundId } — cached bus-to-schedule mapping
 
 const RADIUS_METERS = 80;
+const MASTER_REFRESH_INTERVAL = 5 * 60 * 1000; // Refresh master data every 5 minutes
 
 // Haversine formula to calculate distance between two coordinates
 function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
@@ -53,12 +55,29 @@ function deg2rad(deg) {
     return deg * (Math.PI / 180);
 }
 
+// Format Date as "YYYY-MM-DD HH:mm:ss" using proper timezone API
+function getFormattedDateTime(date = new Date()) {
+    // Use Intl.DateTimeFormat for proper timezone handling
+    const formatter = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    return formatter.format(date).replace('T', ' ');
+}
+
 // Fetch master data
 async function loadMasterData() {
     console.log('[Daemon] Loading master data...');
     try {
         // Load locations (stops)
         const locSnap = await db.collection('locations').get();
+        locationsCache = {};
         locSnap.forEach(doc => {
             const data = doc.data();
             locationsCache[data.name] = { lat: data.lat, lng: data.lng };
@@ -66,49 +85,37 @@ async function loadMasterData() {
         
         // Load detailed schedules
         const schedSnap = await db.collection('detailed_schedules').get();
+        schedulesCache = {};
         schedSnap.forEach(doc => {
             const data = doc.data();
             if (data.stops && Array.isArray(data.stops)) {
                 schedulesCache[doc.id] = data.stops.sort((a, b) => a.order - b.order);
             }
         });
+
+        // Cache bus-to-schedule mapping to avoid querying Firestore on every GPS event
+        const busSchedSnap = await db.collection('schedules').get();
+        busScheduleMap = {};
+        busSchedSnap.forEach(doc => {
+            const data = doc.data();
+            if (data.bus_id) {
+                busScheduleMap[data.bus_id] = doc.id;
+            }
+        });
         
-        console.log(`[Daemon] Loaded ${Object.keys(locationsCache).length} locations and ${Object.keys(schedulesCache).length} schedules.`);
+        console.log(`[Daemon] Loaded ${Object.keys(locationsCache).length} locations, ${Object.keys(schedulesCache).length} schedules, ${Object.keys(busScheduleMap).length} bus-schedule mappings.`);
     } catch (err) {
         console.error('[Daemon] Error loading master data:', err);
     }
 }
 
-// Format Date as "YYYY-MM-DD HH:mm:ss"
-function getFormattedDateTime(date = new Date()) {
-    const tzOffset = 7 * 60 * 60 * 1000; // Asia/Bangkok UTC+7
-    const localTime = new Date(date.getTime() + tzOffset);
-    const str = localTime.toISOString().replace('T', ' ').substring(0, 19);
-    return str;
-}
-
-// Process Bus Movement
+// Process Bus Movement (uses cached data instead of querying Firestore each time)
 async function processBusMovement(busId, data) {
     const { lat, lon, speed, timestamp } = data;
     if (!lat || !lon) return;
 
-    // Get the current active round for this bus
-    const busSnap = await db.collection('buses').doc(busId).get();
-    if (!busSnap.exists) return;
-    
-    const busData = busSnap.data();
-    // Assuming active round is stored in bus document. Wait, how do we know the active round?
-    // Let's check schedules or buses to find current round.
-    // In KMUTNB system, usually 'active_round_id' is stored, or we can find it.
-    // Let's look up schedule where bus_id == busId
-    const schedQuery = await db.collection('schedules').where('bus_id', '==', busId).get();
-    let currentRoundId = null;
-    
-    // For simplicity, just find any active round this bus is assigned to
-    schedQuery.forEach(doc => {
-        currentRoundId = doc.id; // Just taking the first match for this demo, should be more precise in production
-    });
-
+    // Use cached bus-schedule mapping instead of querying Firestore
+    const currentRoundId = busScheduleMap[busId];
     if (!currentRoundId) return;
     
     const stopsForRound = schedulesCache[currentRoundId];
@@ -180,18 +187,40 @@ async function processBusMovement(busId, data) {
     }
 }
 
+// Handler for tracking data changes
+function handleTrackingEvent(snapshot) {
+    const busId = snapshot.key;
+    const data = snapshot.val();
+    processBusMovement(busId, data).catch(err => {
+        console.error(`[Daemon] Error processing bus ${busId}:`, err);
+    });
+}
+
 // Start listener
 async function startDaemon() {
     await loadMasterData();
     
+    // Periodic master data refresh
+    const refreshInterval = setInterval(loadMasterData, MASTER_REFRESH_INTERVAL);
+    
     console.log('[Daemon] Starting RTDB listener on /tracking...');
-    rtdb.ref('tracking').on('child_changed', (snapshot) => {
-        const busId = snapshot.key;
-        const data = snapshot.val();
-        processBusMovement(busId, data).catch(err => {
-            console.error(`[Daemon] Error processing bus ${busId}:`, err);
-        });
-    });
+    const trackingRef = rtdb.ref('tracking');
+    
+    // Listen for both new and updated tracking data
+    trackingRef.on('child_changed', handleTrackingEvent);
+    trackingRef.on('child_added', handleTrackingEvent);
+
+    // Graceful shutdown
+    const shutdown = () => {
+        console.log('[Daemon] Shutting down gracefully...');
+        clearInterval(refreshInterval);
+        trackingRef.off('child_changed', handleTrackingEvent);
+        trackingRef.off('child_added', handleTrackingEvent);
+        process.exit(0);
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
 }
 
 // Run

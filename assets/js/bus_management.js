@@ -1,6 +1,6 @@
 import { app, db, rtdb } from "./firebase-init.js";
 import { collection, onSnapshot, getDocs, query, where } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import { ref, query as dbQuery, limitToLast, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { ref, query as dbQuery, limitToLast, onValue, get } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
 const container = document.getElementById('bus-management-container');
 const busForm = document.getElementById('bus-form');
@@ -9,6 +9,54 @@ const driverSelect = document.getElementById('driver_id');
 
 let busesState = {};
 let driversMap = {};
+let rtdbUnsubscribes = {}; // Track RTDB listeners for cleanup
+
+// --- Status Standardization ---
+const STATUS_MAP = {
+    // Thai variants → standard
+    'พร้อมบริการ': 'พร้อมบริการ',
+    'พร้อมให้บริการ': 'พร้อมบริการ',
+    'กำลังให้บริการ': 'พร้อมบริการ',
+    'active': 'พร้อมบริการ',
+    // Inactive
+    'หยุดบริการ': 'หยุดบริการ',
+    'หยุดให้บริการ': 'หยุดบริการ',
+    'inactive': 'หยุดบริการ',
+    // Maintenance
+    'ซ่อมบำรุง': 'ซ่อมบำรุง',
+    'maintenance': 'ซ่อมบำรุง',
+    // Refueling
+    'เติมน้ำมัน': 'เติมน้ำมัน',
+    'refueling': 'เติมน้ำมัน',
+};
+
+function normalizeStatus(raw) {
+    return STATUS_MAP[raw] || 'ไม่ทราบสถานะ';
+}
+
+function getStatusBadge(status) {
+    switch (status) {
+        case 'พร้อมบริการ':
+            return '<span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-700">พร้อมบริการ</span>';
+        case 'ซ่อมบำรุง':
+            return '<span class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full border border-red-700">ซ่อมบำรุง</span>';
+        case 'หยุดบริการ':
+            return '<span class="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded-full border border-gray-700">หยุดบริการ</span>';
+        case 'เติมน้ำมัน':
+            return '<span class="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full border border-blue-700">เติมน้ำมัน</span>';
+        default:
+            return '<span class="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded-full border border-gray-700">ไม่ทราบสถานะ</span>';
+    }
+}
+
+function getIconColor(status) {
+    switch (status) {
+        case 'ซ่อมบำรุง': return 'text-red-400';
+        case 'เติมน้ำมัน': return 'text-blue-400';
+        case 'หยุดบริการ': return 'text-gray-400';
+        default: return 'text-white';
+    }
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadDriversData();
@@ -23,7 +71,7 @@ async function loadDriversData() {
         usersSnap.forEach(doc => {
             const data = doc.data();
             driversMap[doc.id] = data;
-            
+
             const option = document.createElement('option');
             option.value = doc.id;
             option.textContent = data.name || doc.id;
@@ -84,7 +132,7 @@ window.openEditModal = (busId) => {
     document.getElementById('bus_id_hidden').value = busId;
     document.getElementById('license_plate').value = bus.plateNumber;
     document.getElementById('driver_id').value = bus.driverId || '';
-    document.getElementById('status').value = (bus.status === 'กำลังให้บริการ' || bus.status === 'พร้อมให้บริการ' || bus.status === 'พร้อมบริการ' || bus.status === 'active') ? 'active' : bus.status;
+    document.getElementById('status').value = bus.normalizedStatus;
     document.getElementById('is_active').checked = bus.isActive;
     document.getElementById('bus_brand').value = bus.busBrand || '';
     document.getElementById('bus_type').value = bus.busType || '';
@@ -116,7 +164,7 @@ function startBusManagement() {
             const data = doc.data();
             const busId = doc.id;
             const rtdbBusId = data.bus_id || busId;
-            
+
             if (!busesState[busId]) {
                 busesState[busId] = {
                     id: busId,
@@ -126,7 +174,7 @@ function startBusManagement() {
                     batteryVoltage: null,
                 };
             }
-            
+
             let driverName = "ไม่ระบุชื่อคนขับ";
             if (data.driver_id && driversMap[data.driver_id]) {
                 driverName = driversMap[data.driver_id].name || driverName;
@@ -134,12 +182,16 @@ function startBusManagement() {
                 driverName = data.driver_name;
             }
 
+            const rawStatus = data.status || "unknown";
+            const normalized = normalizeStatus(rawStatus);
+
             busesState[busId] = {
                 ...busesState[busId],
                 plateNumber: data.license_plate || data.bus_number || data.name || "ไม่ระบุทะเบียน",
                 driverId: data.driver_id || "-",
                 driverName: driverName,
-                status: data.status || "unknown",
+                status: rawStatus,
+                normalizedStatus: normalized,
                 isActive: data.is_active || false,
                 capacity: data.capacity || "-",
                 busBrand: data.bus_brand || "-",
@@ -147,13 +199,12 @@ function startBusManagement() {
                 busSeats: data.bus_seats || "-"
             };
 
-            // Attach RTDB listener for battery
+            // Attach RTDB listener for battery (with proper cleanup)
             if (!busesState[busId].rtdbAttached && rtdbBusId) {
                 busesState[busId].rtdbAttached = true;
-                // Assuming battery data is sent along with tracking data
                 const trackingRef = dbQuery(ref(rtdb, "tracking/" + rtdbBusId), limitToLast(1));
-                
-                onValue(trackingRef, (rtSnapshot) => {
+
+                const unsubTracking = onValue(trackingRef, (rtSnapshot) => {
                     if (rtSnapshot.exists()) {
                         rtSnapshot.forEach((childSnap) => {
                             const rtData = childSnap.val();
@@ -164,23 +215,26 @@ function startBusManagement() {
                                 busesState[busId].batteryVoltage = rtData.battery_voltage;
                             }
                         });
+                        renderBuses();
                     } else {
-                        // Attempt to see if there's a direct monitoring node as alternative
+                        // Use get() instead of onValue to avoid nested listener leak
                         const monitorRef = ref(rtdb, "monitoring/" + rtdbBusId);
-                        onValue(monitorRef, (monSnap) => {
+                        get(monitorRef).then((monSnap) => {
                             if (monSnap.exists()) {
                                 const mData = monSnap.val();
-                                if(mData.battery_percent !== undefined) busesState[busId].batteryPercent = mData.battery_percent;
-                                if(mData.battery_voltage !== undefined) busesState[busId].batteryVoltage = mData.battery_voltage;
+                                if (mData.battery_percent !== undefined) busesState[busId].batteryPercent = mData.battery_percent;
+                                if (mData.battery_voltage !== undefined) busesState[busId].batteryVoltage = mData.battery_voltage;
                                 renderBuses();
                             }
-                        });
+                        }).catch(() => { });
                     }
-                    renderBuses();
                 });
+
+                // Store unsubscribe function for potential cleanup
+                rtdbUnsubscribes[busId] = unsubTracking;
             }
         });
-        
+
         renderBuses();
     }, (error) => {
         console.error("Error fetching buses: ", error);
@@ -193,8 +247,6 @@ function startBusManagement() {
 }
 
 function renderBuses() {
-    container.innerHTML = '';
-    
     if (Object.keys(busesState).length === 0) {
         container.innerHTML = `
             <div class="col-span-full text-center py-8 text-gray-500">
@@ -204,26 +256,17 @@ function renderBuses() {
         return;
     }
 
-    for (const [id, bus] of Object.entries(busesState)) {
-        let statusBadge = '';
-        if (bus.status === 'active' || bus.status === 'กำลังให้บริการ' || bus.status === 'พร้อมให้บริการ' || bus.status === 'พร้อมบริการ' || bus.isActive) {
-            statusBadge = '<span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-700">กำลังวิ่ง</span>';
-        } else if (bus.status === 'maintenance' || bus.status === 'ซ่อมบำรุง') {
-            statusBadge = '<span class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full border border-red-700">ซ่อมบำรุง</span>';
-        } else if (bus.status === 'inactive' || bus.status === 'หยุดให้บริการ') {
-            statusBadge = '<span class="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded-full border border-gray-700">หยุดให้บริการ</span>';
-        } else {
-            statusBadge = '<span class="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded-full border border-gray-700">ไม่ทราบสถานะ</span>';
-        }
+    // Build all cards as string first, then assign once (no innerHTML += in loop)
+    let html = '';
 
-        let iconTextColor = 'text-white';
-        if (bus.status === 'maintenance' || bus.status === 'ซ่อมบำรุง') {
-            iconTextColor = 'text-red-400';
-        }
+    for (const [id, bus] of Object.entries(busesState)) {
+        const status = bus.normalizedStatus || normalizeStatus(bus.status);
+        const statusBadge = getStatusBadge(status);
+        const iconTextColor = getIconColor(status);
 
         let batteryColor = 'text-gray-400';
         let batteryIcon = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>';
-        
+
         if (bus.batteryPercent !== null) {
             if (bus.batteryPercent > 60) {
                 batteryColor = 'text-green-500';
@@ -233,7 +276,6 @@ function renderBuses() {
                 batteryColor = 'text-red-500';
             }
 
-            // Simple battery level icon
             if (bus.batteryPercent > 80) {
                 batteryIcon = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 10V14C20 15.6569 18.6569 17 17 17H7C5.34315 17 4 15.6569 4 14V10C4 8.34315 5.34315 7 7 7H17C18.6569 7 20 8.34315 20 10ZM12 9V15M16 9V15M8 9V15"></path><path d="M22 11V13C22 13.5523 21.5523 14 21 14H20V10H21C21.5523 10 22 10.4477 22 11Z" fill="currentColor"></path>';
             } else if (bus.batteryPercent > 40) {
@@ -245,7 +287,7 @@ function renderBuses() {
             }
         }
 
-        const batteryDisplay = bus.batteryPercent !== null 
+        const batteryDisplay = bus.batteryPercent !== null
             ? `
             <div class="relative w-16 h-16 shrink-0">
                 <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
@@ -265,7 +307,7 @@ function renderBuses() {
                 รอข้อมูล
             </div>`;
 
-        const card = `
+        html += `
             <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center space-x-3">
@@ -320,6 +362,7 @@ function renderBuses() {
                 </button>
             </div>
         `;
-        container.innerHTML += card;
     }
+
+    container.innerHTML = html;
 }

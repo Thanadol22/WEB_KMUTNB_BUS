@@ -250,7 +250,7 @@ $isDarkMode = ($theme === 'dark');
                     if (file_exists($pagePath)) {
                         include $pagePath;
                     } else {
-                        echo "<div class='text-center mt-20'><h2 class='text-2xl text-red-500'>404 Page Not Found</h2><p class='text-gray-400 mt-2'>The requested page `{$page}` does not exist.</p></div>";
+                        echo "<div class='text-center mt-20'><h2 class='text-2xl text-red-500'>404 Page Not Found</h2><p class='text-gray-400 mt-2'>The requested page `" . htmlspecialchars($page) . "` does not exist.</p></div>";
                     }
                 ?>
                 </div>

@@ -1,17 +1,21 @@
-import { app, db, rtdb } from "./firebase-init.js";
+import { db, rtdb } from "./firebase-init.js";
 import { collection, onSnapshot, query as fsQuery, getDocs, where } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import { ref, query as dbQuery, limitToLast, onValue, onChildAdded, onChildRemoved } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { ref, query as dbQuery, limitToLast, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-// Define stops and their sequence based on the schedule image
-const BUS_STOPS_SEQUENCE = [
-    { id: 'dorm', name: 'หอพักฯ' },
-    { id: 'front', name: 'หน้า ม.' },
-    { id: 'admin', name: 'บริหารฯ' },
-    { id: 'industry', name: 'อุตฯ' },
-    { id: 'building', name: 'อาคาร' },
-    { id: 'tech', name: 'เทคโนฯ' },
-    { id: 'eng', name: 'วิศวะฯ' }
-];
+// --- Status Normalization (shared across tracking views) ---
+const TRACKING_STATUS_MAP = {
+    'พร้อมบริการ': 'พร้อมบริการ', 'พร้อมให้บริการ': 'พร้อมบริการ',
+    'กำลังให้บริการ': 'พร้อมบริการ', 'active': 'พร้อมบริการ', 'running': 'พร้อมบริการ',
+    'หยุดบริการ': 'หยุดบริการ', 'หยุดให้บริการ': 'หยุดบริการ', 'inactive': 'หยุดบริการ',
+    'ซ่อมบำรุง': 'ซ่อมบำรุง', 'maintenance': 'ซ่อมบำรุง',
+    'เติมน้ำมัน': 'เติมน้ำมัน', 'refueling': 'เติมน้ำมัน',
+};
+function normalizeTrackingStatus(raw) {
+    return TRACKING_STATUS_MAP[raw] || 'ไม่ทราบสถานะ';
+}
+
+// Stop sequence loaded dynamically from Firestore 'detailed_schedules'
+let stopSequenceFromDB = []; // [{ order, name, lat, lng }] sorted by order
 
 // ─── ETA Constants ────────────────────────────────────────────────────────────
 const FALLBACK_SPEED_KMH = 20;     // ความเร็วเฉลี่ยภายในมหาวิทยาลัย (km/h)
@@ -36,6 +40,7 @@ if (document.readyState === 'loading') {
         initMap();
         await loadDriversData();
         await loadBusStops();
+        await loadStopSequence();
         await loadSchedules();
         startLiveTracking();
     });
@@ -45,6 +50,7 @@ if (document.readyState === 'loading') {
         initMap();
         await loadDriversData();
         await loadBusStops();
+        await loadStopSequence();
         await loadSchedules();
         startLiveTracking();
     })();
@@ -56,7 +62,7 @@ async function loadSchedules() {
         querySnapshot.forEach((doc) => {
             predefinedSchedules.push(doc.data());
         });
-        
+
         // Sort by round, then by start_time
         predefinedSchedules.sort((a, b) => {
             if (a.round === b.round) {
@@ -67,6 +73,37 @@ async function loadSchedules() {
         console.log("Schedules loaded:", predefinedSchedules.length);
     } catch (e) {
         console.error("Error loading schedules:", e);
+    }
+}
+
+// Load stop sequence from detailed_schedules (uses first/most complete round)
+async function loadStopSequence() {
+    try {
+        const querySnapshot = await getDocs(collection(db, "detailed_schedules"));
+        let bestStops = [];
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.stops && Array.isArray(data.stops) && data.stops.length > bestStops.length) {
+                bestStops = data.stops;
+            }
+        });
+
+        if (bestStops.length > 0) {
+            stopSequenceFromDB = bestStops
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map(s => ({
+                    name: s.name,
+                    lat: parseFloat(s.lat) || 0,
+                    lng: parseFloat(s.lng) || 0,
+                    order: s.order || 0
+                }));
+            console.log("Stop sequence loaded from DB:", stopSequenceFromDB.length, "stops");
+        } else {
+            console.warn("No stop sequence found in detailed_schedules, will use locations fallback");
+        }
+    } catch (e) {
+        console.error("Error loading stop sequence:", e);
     }
 }
 
@@ -108,11 +145,11 @@ async function loadBusStops() {
                 const lat = parseFloat(data.lat);
                 const lng = parseFloat(data.lng);
                 const name = data.name || 'จุดจอดรถ';
-                
-                L.marker([lat, lng], {icon: stopIcon})
-                  .addTo(map)
-                  .bindPopup(`<b class="text-gray-800">${name}</b><br>จุดรับ-ส่ง`);
-                  
+
+                L.marker([lat, lng], { icon: stopIcon })
+                    .addTo(map)
+                    .bindPopup(`<b class="text-gray-800">${name}</b><br>จุดรับ-ส่ง`);
+
                 busStopCoordinates.push({
                     id: doc.id,
                     name: name,
@@ -143,7 +180,7 @@ function initMap() {
     }).addTo(map);
 
     // Custom Map Attribution (move to bottom left)
-    L.control.attribution({position: 'bottomleft'}).addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors').addTo(map);
+    L.control.attribution({ position: 'bottomleft' }).addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors').addTo(map);
 
     // Provide center function globally
     window.centerMap = () => {
@@ -174,18 +211,18 @@ function startLiveTracking() {
             const data = doc.data();
             const busId = doc.id;
             const rtdbBusId = data.bus_id || busId;
-            
+
             if (!busesState[busId]) {
                 busesState[busId] = {
                     position: { lat: null, lng: null },
                     rtdbAttached: false
                 };
             }
-            
+
             const lat = data.lat || null;
             const lng = data.lng || null;
             const status = data.status || 'unknown'; // active, maintenance, pause
-            
+
             // Map the driver id to name using the preloaded driversMap
             let driverName = 'ไม่ระบุชื่อคนขับ';
             let driverPhone = '-';
@@ -215,21 +252,21 @@ function startLiveTracking() {
             if (!busesState[busId].rtdbAttached && rtdbBusId) {
                 busesState[busId].rtdbAttached = true;
                 const trackingRef = dbQuery(ref(rtdb, "tracking/" + rtdbBusId), limitToLast(1));
-                
+
                 onValue(trackingRef, (rtSnapshot) => {
                     if (!rtSnapshot.exists()) {
                         busesState[busId].hasRtdbData = false;
-                        
+
                         // Remove marker from map
                         if (markers[busId]) {
                             map.removeLayer(markers[busId]);
                             delete markers[busId];
                         }
-                        
+
                         updateLiveMapAndList();
                         return;
                     }
-                    
+
                     rtSnapshot.forEach((childSnap) => {
                         const rtData = childSnap.val();
                         if (rtData.lat && rtData.lon) {
@@ -237,24 +274,24 @@ function startLiveTracking() {
                                 lat: parseFloat(rtData.lat),
                                 lng: parseFloat(rtData.lon)
                             };
-                            
+
                             // Get speed if available to calculate ETA
                             if (rtData.speed) {
                                 busesState[busId].metadata.speed = parseFloat(rtData.speed);
                             }
-                            
+
                             busesState[busId].hasRtdbData = true;
-                            
+
                             // Calculate ETA and next stop based on current pos
                             calculateEta(busId);
-                            
+
                             updateLiveMapAndList();
                         }
                     });
                 });
             }
         });
-        
+
         updateLiveMapAndList();
 
     }, (error) => {
@@ -272,10 +309,10 @@ function startLiveTracking() {
 function updateLiveMapAndList() {
     const container = document.getElementById('bus-list-container');
     if (!container) return;
-    
+
     // Check if empty
     if (Object.keys(busesState).length === 0) return;
-    
+
     let renderedCount = 0;
     container.innerHTML = ''; // Re-render the list purely from state
 
@@ -309,14 +346,24 @@ function updateBusMarker(id, lat, lng, plate, status, nextStop, eta) {
 
     if (!lat || !lng) return;
 
-    const isActive = status === 'active' || status === 'พร้อมให้บริการ' || status === 'พร้อมบริการ' || status === 'กำลังให้บริการ';
-    
-    // Bus Icon
-    const busIconColor = isActive ? 'bg-green-500' : 'bg-gray-500';
+    // Normalize status
+    const normalizedStatus = normalizeTrackingStatus(status);
+
+    // Bus Icon colors based on status
+    let busIconColor, iconTextColor, borderColor;
+    switch (normalizedStatus) {
+        case 'พร้อมบริการ':
+            busIconColor = 'bg-green-500'; iconTextColor = 'text-green-500'; borderColor = 'border-green-500'; break;
+        case 'ซ่อมบำรุง':
+            busIconColor = 'bg-red-500'; iconTextColor = 'text-red-500'; borderColor = 'border-red-500'; break;
+        case 'เติมน้ำมัน':
+            busIconColor = 'bg-yellow-500'; iconTextColor = 'text-yellow-500'; borderColor = 'border-yellow-500'; break;
+        case 'หยุดบริการ':
+        default:
+            busIconColor = 'bg-gray-500'; iconTextColor = 'text-gray-400'; borderColor = 'border-gray-300'; break;
+    }
     const iconBg = 'bg-white shadow-sm';
-    const iconTextColor = isActive ? 'text-green-500' : 'text-gray-400';
-    const borderColor = isActive ? 'border-green-500' : 'border-gray-300';
-    
+
     const busIconHtml = `
         <div class="relative flex flex-col items-center">
             <div class="w-12 h-12 rounded-full ${iconBg} border-2 ${borderColor} shadow-md flex items-center justify-center relative z-10 bg-white">
@@ -359,7 +406,7 @@ function updateBusMarker(id, lat, lng, plate, status, nextStop, eta) {
         markers[id].setPopupContent(popupHtml);
     } else {
         // Create new marker
-        markers[id] = L.marker([lat, lng], {icon: icon})
+        markers[id] = L.marker([lat, lng], { icon: icon })
             .addTo(map)
             .bindPopup(popupHtml);
     }
@@ -368,15 +415,15 @@ function updateBusMarker(id, lat, lng, plate, status, nextStop, eta) {
 // Calculate distance in meters between two lat/lng points using Haversine formula
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3; // metres
-    const φ1 = lat1 * Math.PI/180;
-    const φ2 = lat2 * Math.PI/180;
-    const Δφ = (lat2-lat1) * Math.PI/180;
-    const Δλ = (lon2-lon1) * Math.PI/180;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c;
 }
@@ -498,48 +545,55 @@ function calculateEta(busId) {
 }
 
 // ─── Build Ordered Stops with Coordinates ─────────────────────────────────────
-// จับคู่ BUS_STOPS_SEQUENCE กับพิกัด GPS จาก busStopCoordinates (Firestore locations)
+// ใช้ข้อมูลจาก detailed_schedules (DB) แทน hardcode
 function buildOrderedStops() {
-    if (busStopCoordinates.length === 0) return [];
-
-    const result = [];
-    for (const seqStop of BUS_STOPS_SEQUENCE) {
-        // หาพิกัดจาก Firestore locations โดย fuzzy match ชื่อ
-        const matched = busStopCoordinates.find(coord =>
-            coord.name === seqStop.name ||
-            coord.name.includes(seqStop.name) ||
-            seqStop.name.includes(coord.name) ||
-            coord.id === seqStop.id
-        );
-        if (matched) {
-            result.push({
-                id: seqStop.id,
-                name: seqStop.name,
-                lat: matched.lat,
-                lng: matched.lng
-            });
-        }
+    // Priority 1: ใช้ stop sequence จาก detailed_schedules (มี order + ชื่อตรงกับ DB)
+    if (stopSequenceFromDB.length > 0) {
+        // ถ้ามี lat/lng ใน detailed_schedules ใช้เลย ถ้าไม่มีให้ match กับ locations
+        return stopSequenceFromDB.map(stop => {
+            if (stop.lat && stop.lng && stop.lat !== 0 && stop.lng !== 0) {
+                return { name: stop.name, lat: stop.lat, lng: stop.lng };
+            }
+            // Fallback: หาพิกัดจาก locations collection
+            const matched = busStopCoordinates.find(c => c.name === stop.name);
+            if (matched) {
+                return { name: stop.name, lat: matched.lat, lng: matched.lng };
+            }
+            return null;
+        }).filter(s => s !== null);
     }
 
-    // ถ้า match ไม่ได้เลย ใช้ busStopCoordinates ตามลำดับเดิม
-    if (result.length === 0) {
-        return busStopCoordinates.map(c => ({ id: c.id, name: c.name, lat: c.lat, lng: c.lng }));
+    // Priority 2: ใช้ busStopCoordinates จาก locations collection
+    if (busStopCoordinates.length > 0) {
+        return busStopCoordinates.map(c => ({ name: c.name, lat: c.lat, lng: c.lng }));
     }
 
-    return result;
+    return [];
 }
 
 function createBusCardHtml(id, driverName, driverPhone, plate, status, nextStop, eta) {
-    const isActive = status === 'active' || status === 'พร้อมให้บริการ' || status === 'พร้อมบริการ' || status === 'กำลังให้บริการ';
-    
-    const borderColor = isActive ? 'border-green-500' : 'border-gray-600';
-    const badgeColor = isActive ? 'bg-green-100 text-green-700' : 'bg-gray-700 text-gray-300';
-    const iconBg = isActive ? 'bg-green-50' : 'bg-gray-50';
-    const iconColor = isActive ? 'text-green-600' : 'text-gray-400';
-    const printStatus = isActive ? 'กำลังให้บริการ' : status;
+    const normalizedStatus = normalizeTrackingStatus(status);
+
+    let borderColor, badgeColor, iconBg, iconColor;
+    switch (normalizedStatus) {
+        case 'พร้อมบริการ':
+            borderColor = 'border-green-500'; badgeColor = 'bg-green-100 text-green-700';
+            iconBg = 'bg-green-50'; iconColor = 'text-green-600'; break;
+        case 'ซ่อมบำรุง':
+            borderColor = 'border-red-500'; badgeColor = 'bg-red-100 text-red-700';
+            iconBg = 'bg-red-50'; iconColor = 'text-red-600'; break;
+        case 'เติมน้ำมัน':
+            borderColor = 'border-blue-500'; badgeColor = 'bg-blue-100 text-blue-700';
+            iconBg = 'bg-blue-50'; iconColor = 'text-blue-600'; break;
+        case 'หยุดบริการ':
+        default:
+            borderColor = 'border-gray-600'; badgeColor = 'bg-gray-700 text-gray-300';
+            iconBg = 'bg-gray-50'; iconColor = 'text-gray-400'; break;
+    }
+    const printStatus = normalizedStatus;
     const printEta = eta || '-';
     const displayId = busesState[id]?.metadata?.rtdbBusId || id;
-    
+
     return `
         <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl border-2 ${borderColor} hover:shadow-lg transition-all cursor-pointer mb-4 relative overflow-hidden" onclick="focusBusOnMap('${id}')">
             <div class="flex items-center space-x-4">
