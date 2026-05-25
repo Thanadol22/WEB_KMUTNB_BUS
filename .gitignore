@@ -22,3 +22,6 @@ desktop.ini
 # Firebase Admin SDK configs
 config/*.json
 config/service-account.json
+
+# Documentation
+document/

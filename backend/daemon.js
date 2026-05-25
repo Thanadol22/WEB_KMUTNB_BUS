@@ -110,7 +110,21 @@ async function loadMasterData() {
 }
 
 // Process Bus Movement (uses cached data instead of querying Firestore each time)
-async function processBusMovement(busId, data) {
+async function processBusMovement(busId, rawData) {
+    if (!rawData) return;
+
+    // Extract latest data if nested push keys exist (e.g. tracking/BUS01/-Oqip...)
+    let data = rawData;
+    const keys = Object.keys(rawData);
+    const hasNested = keys.some(k => rawData[k] && typeof rawData[k] === 'object');
+    if (hasNested) {
+        const pushKeys = keys.filter(k => k !== 'status' && k !== 'last_updated' && k !== 'battery_percent' && k !== 'battery' && k !== 'batt' && typeof rawData[k] === 'object')
+                             .sort();
+        if (pushKeys.length > 0) {
+            data = rawData[pushKeys[pushKeys.length - 1]];
+        }
+    }
+
     const { lat, lon, speed, timestamp } = data;
     if (!lat || !lon) return;
 
@@ -187,6 +201,74 @@ async function processBusMovement(busId, data) {
     }
 }
 
+// Delete raw GPS tracking data older than 3 days
+async function cleanOldTrackingData() {
+    console.log('[Daemon] Running tracking data cleanup...');
+    try {
+        const trackingRef = rtdb.ref('tracking');
+        const snapshot = await trackingRef.get();
+        if (!snapshot.exists()) {
+            console.log('[Daemon] No tracking data found for cleanup.');
+            return;
+        }
+
+        const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+        let deleteCount = 0;
+
+        const busesData = snapshot.val();
+        for (const busId in busesData) {
+            const busNode = busesData[busId];
+            if (typeof busNode !== 'object' || busNode === null) continue;
+
+            for (const key in busNode) {
+                // Skip metadata nodes at the root of the bus node
+                if (key === 'status' || key === 'last_updated' || key === 'battery_percent' || key === 'battery' || key === 'batt' || key === 'battery_voltage') {
+                    continue;
+                }
+
+                const point = busNode[key];
+                if (typeof point !== 'object' || point === null) continue;
+
+                let pointTimestamp = null;
+
+                if (point.timestamp) {
+                    pointTimestamp = Number(point.timestamp);
+                } else if (point.date && point.time) {
+                    // Parse date "20/5/2026" and time "14:7:53"
+                    const dateParts = point.date.split('/'); // [d, m, yyyy]
+                    const timeParts = point.time.split(':'); // [hh, mm, ss]
+                    if (dateParts.length === 3 && timeParts.length === 3) {
+                        const day = parseInt(dateParts[0], 10);
+                        const month = parseInt(dateParts[1], 10);
+                        const year = parseInt(dateParts[2], 10);
+                        const hour = parseInt(timeParts[0], 10);
+                        const minute = parseInt(timeParts[1], 10);
+                        const second = parseInt(timeParts[2], 10);
+                        
+                        // Construct precise ISO string using Asia/Bangkok (+07:00) offset to prevent timezone shift issues
+                        const pad = (num) => String(num).padStart(2, '0');
+                        const isoString = `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}+07:00`;
+                        
+                        const parsedDate = new Date(isoString);
+                        if (!isNaN(parsedDate.getTime())) {
+                            pointTimestamp = parsedDate.getTime();
+                        }
+                    }
+                }
+
+                // Delete if older than 3 days
+                if (pointTimestamp && pointTimestamp < threeDaysAgo) {
+                    await rtdb.ref(`tracking/${busId}/${key}`).remove();
+                    deleteCount++;
+                }
+            }
+        }
+        console.log(`[Daemon] Cleanup complete. Deleted ${deleteCount} old GPS data points.`);
+    } catch (err) {
+        console.error('[Daemon] Error during tracking data cleanup:', err);
+    }
+}
+
 // Handler for tracking data changes
 function handleTrackingEvent(snapshot) {
     const busId = snapshot.key;
@@ -202,6 +284,10 @@ async function startDaemon() {
     
     // Periodic master data refresh
     const refreshInterval = setInterval(loadMasterData, MASTER_REFRESH_INTERVAL);
+
+    // Initial GPS data cleanup and periodic cleanup every 12 hours
+    cleanOldTrackingData();
+    const cleanupInterval = setInterval(cleanOldTrackingData, 12 * 60 * 60 * 1000);
     
     console.log('[Daemon] Starting RTDB listener on /tracking...');
     const trackingRef = rtdb.ref('tracking');
@@ -214,6 +300,7 @@ async function startDaemon() {
     const shutdown = () => {
         console.log('[Daemon] Shutting down gracefully...');
         clearInterval(refreshInterval);
+        clearInterval(cleanupInterval);
         trackingRef.off('child_changed', handleTrackingEvent);
         trackingRef.off('child_added', handleTrackingEvent);
         process.exit(0);
