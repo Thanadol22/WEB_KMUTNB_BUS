@@ -8,7 +8,8 @@ $totalUsers = count($users);
 $roleCounts = [
     'student' => 0,
     'driver' => 0,
-    'admin' => 0
+    'admin' => 0,
+    'teacher' => 0
 ];
 
 foreach ($users as $user) {
@@ -118,6 +119,7 @@ foreach ($buses as $bus) {
             if ($max == 0) $max = 1;
             $items = [
                 ['label' => 'นักศึกษา', 'val' => $roleCounts['student'], 'color' => 'bg-indigo-500'],
+                ['label' => 'อาจารย์', 'val' => $roleCounts['teacher'], 'color' => 'bg-amber-500'],
                 ['label' => 'คนขับรถ', 'val' => $roleCounts['driver'], 'color' => 'bg-orange-500'],
                 ['label' => 'แอดมิน', 'val' => $roleCounts['admin'], 'color' => 'bg-primary']
             ];

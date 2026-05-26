@@ -14,6 +14,7 @@
     <div class="flex space-x-2" id="filter-container">
         <button data-role="all" class="filter-btn px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-600 hover:bg-gray-700 active-filter">ทั้งหมด</button>
         <button data-role="student" class="filter-btn px-4 py-2 rounded-lg bg-transparent text-gray-400 border border-transparent hover:bg-gray-800">นักศึกษา</button>
+        <button data-role="teacher" class="filter-btn px-4 py-2 rounded-lg bg-transparent text-gray-400 border border-transparent hover:bg-gray-800">อาจารย์</button>
         <button data-role="admin" class="filter-btn px-4 py-2 rounded-lg bg-transparent text-gray-400 border border-transparent hover:bg-gray-800">ผู้ดูแลระบบ</button>
     </div>
     <div class="relative w-full md:w-64">
@@ -65,6 +66,7 @@
                 <label class="block text-sm font-medium text-gray-400 mb-1">บทบาท <span class="text-red-500">*</span></label>
                 <select id="userRole" name="role" class="w-full bg-darkbg border border-gray-700 text-white rounded-lg px-4 py-2 focus:border-primary focus:ring-1 focus:ring-primary outline-none" required>
                     <option value="student">นักศึกษา (Student)</option>
+                    <option value="teacher">อาจารย์ (Teacher)</option>
                     <option value="admin">ผู้ดูแลระบบ (Admin)</option>
                 </select>
             </div>

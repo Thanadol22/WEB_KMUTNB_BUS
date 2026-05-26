@@ -164,6 +164,8 @@ function renderTable(users) {
         let roleText = '';
         if (user.role === 'student') {
             roleText = '<span class="bg-blue-900/50 text-white py-1 px-2 text-xs rounded-full border border-blue-700 whitespace-nowrap inline-block">นักศึกษา</span>';
+        } else if (user.role === 'teacher') {
+            roleText = '<span class="bg-amber-900/50 text-white py-1 px-2 text-xs rounded-full border border-amber-700 whitespace-nowrap inline-block">อาจารย์</span>';
         } else if (user.role === 'driver') {
             roleText = '<span class="bg-green-900/50 text-white py-1 px-2 text-xs rounded-full border border-green-700 whitespace-nowrap inline-block">พนักงานขับรถ</span>';
         } else {
