@@ -10,6 +10,15 @@ let driversMap = {};       // map of driver_id -> user
 let busesMap = {};         // map of bus_id -> bus details
 let unsubscribeHistory = null;
 
+// Helper: find bus data by bus_id field (daemon records RTDB key as bus_id)
+function findBusByBusId(busId) {
+    if (busesMap[busId]) return busesMap[busId];
+    for (const [docId, bus] of Object.entries(busesMap)) {
+        if (bus.bus_id === busId) return bus;
+    }
+    return null;
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     await loadUsersAndBuses();
@@ -31,6 +40,7 @@ async function loadUsersAndBuses() {
             busesMap[doc.id] = doc.data();
         });
         console.log("[History] Base data loaded.", Object.keys(driversMap).length, "drivers", Object.keys(busesMap).length, "buses");
+        populateBusFilter();
     } catch (e) {
         console.error("[History] Failed to load base data:", e);
     }
@@ -108,14 +118,17 @@ function renderHistoryTable() {
     const container = document.getElementById('history-table-container');
     if (!container) return;
 
+    const filterBus = getFilterBus();
     const filterStop = getFilterStop();
     const filterStatus = getFilterStatus();
 
-    // Group logs by roundId
-    // pivotMap: { roundId: { busId, roundNum, stops: { stopOrder: logEntry } } }
+    // Group logs by roundId AND busId to prevent mixing logs from different buses
+    // pivotMap: { pivotKey: { bus_id, raw_bus_id, roundNum, roundId, stops: { stopOrder: logEntry } } }
     const pivotMap = {};
     allLogs.forEach(log => {
         const roundId = log.round_id || log.roundId || 'unknown';
+        const busRefId = log.bus_id || log.busId || 'unknown';
+        const pivotKey = `${roundId}_${busRefId}`;
         
         let driverName = log.driverName || log.driver_name || '-';
         if (log.driver_id && driversMap[log.driver_id]) {
@@ -127,18 +140,17 @@ function renderHistoryTable() {
         let plateNumber = log.plateNumber || log.license_plate || log.plate_number || '-';
         let busDisplayId = log.bus_id || log.busId || '-';
         
-        const busRefId = log.bus_id || log.busId;
-        if (busRefId && busesMap[busRefId]) {
-            plateNumber = busesMap[busRefId].license_plate || busesMap[busRefId].plate_number || plateNumber;
-            // Use bus number if available, else keep the ID limit
-            if (busesMap[busRefId].bus_number || busesMap[busRefId].number) {
-                 busDisplayId = "รถคันที่ " + (busesMap[busRefId].bus_number || busesMap[busRefId].number);
-            }
+        const busInfo = findBusByBusId(busRefId);
+        if (busInfo) {
+            plateNumber = busInfo.license_plate || busInfo.plate_number || plateNumber;
+            busDisplayId = busInfo.bus_id || busRefId;
         }
 
-        if (!pivotMap[roundId]) {
-            pivotMap[roundId] = {
-                busId: busDisplayId,
+        if (!pivotMap[pivotKey]) {
+            pivotMap[pivotKey] = {
+                pivotKey: pivotKey,
+                bus_id: busDisplayId,
+                raw_bus_id: busRefId,
                 plateNumber: plateNumber,
                 driverName: driverName,
                 roundNum: parseInt(roundId.replace(/\D/g, '')) || 0,
@@ -149,8 +161,6 @@ function renderHistoryTable() {
         
         let stopName = log.currentStop || log.stop_name || log.stopName;
         
-        // Always try to map the stop name via scheduleTime if available.
-        // This ensures mismatching names (e.g. "หอพักชาย" vs "หอพักนักศึกษา") are mapped properly.
         if (log.scheduleTime) {
             const stopsForRound = scheduleStops[roundId] || [];
             const matchedStop = stopsForRound.find(s => s.scheduleTime === log.scheduleTime);
@@ -159,56 +169,68 @@ function renderHistoryTable() {
             }
         }
 
-        // Even without schedule time, we can try to match by name fuzzily or let exact match happen
         if (stopName && stopName !== "กำลังเดินทาง (ไม่อยู่ที่ป้าย)") {
-            // Find if there's any similar named stop in schedule to normalize name
             const stopsForRound = scheduleStops[roundId] || [];
             if (!stopsForRound.find(s => s.name === stopName) && !log.scheduleTime) {
                  const fuzzyMatch = stopsForRound.find(s => stopName.includes(s.name) || s.name.includes(stopName));
                  if (fuzzyMatch) stopName = fuzzyMatch.name;
             }
-            pivotMap[roundId].stopData[stopName] = log;
+            pivotMap[pivotKey].stopData[stopName] = log;
         }
 
-        // Update bus info with latest entry per round
-        if (busDisplayId && busDisplayId !== '-') pivotMap[roundId].busId = busDisplayId;
-        if (plateNumber && plateNumber !== '-') pivotMap[roundId].plateNumber = plateNumber;
-        if (driverName && driverName !== '-') pivotMap[roundId].driverName = driverName;
+        if (busDisplayId && busDisplayId !== '-') pivotMap[pivotKey].bus_id = busDisplayId;
+        if (busRefId) pivotMap[pivotKey].raw_bus_id = busRefId;
+        if (plateNumber && plateNumber !== '-') pivotMap[pivotKey].plateNumber = plateNumber;
+        if (driverName && driverName !== '-') pivotMap[pivotKey].driverName = driverName;
     });
 
-    // Get all unique round IDs from both scheduleStops and pivotMap
-    const allRoundIds = new Set([
-        ...Object.keys(scheduleStops),
-        ...Object.keys(pivotMap)
-    ]);
+    const scheduleRoundIds = Object.keys(scheduleStops);
+    let displayRows = []; // { pivotKey, roundId, isScheduledOnly }
 
-    // Sort by round number
-    const sortedRoundIds = [...allRoundIds].sort((a, b) => {
-        const ra = scheduleStops[a]?.[0]?.order ?? 99;
-        const rb = scheduleStops[b]?.[0]?.order ?? 99;
-        // sort by round number encoded in ID like "round_01"
-        const numA = parseInt(a.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.replace(/\D/g, '')) || 0;
-        return numA - numB;
+    if (filterBus) {
+        for (const pk in pivotMap) {
+            if (pivotMap[pk].raw_bus_id === filterBus) {
+                displayRows.push({ pivotKey: pk, roundId: pivotMap[pk].roundId });
+            }
+        }
+    } else {
+        const drivenRounds = new Set();
+        for (const pk in pivotMap) {
+            displayRows.push({ pivotKey: pk, roundId: pivotMap[pk].roundId });
+            drivenRounds.add(pivotMap[pk].roundId);
+        }
+        for (const rid of scheduleRoundIds) {
+            if (!drivenRounds.has(rid)) {
+                displayRows.push({ pivotKey: rid, roundId: rid, isScheduledOnly: true });
+            }
+        }
+    }
+
+    // Sort by round number, then by pivotKey (busId)
+    displayRows.sort((a, b) => {
+        const numA = parseInt(a.roundId.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.roundId.replace(/\D/g, '')) || 0;
+        if (numA !== numB) return numA - numB;
+        return a.pivotKey.localeCompare(b.pivotKey);
     });
 
-    // Filter rows: if filterStop selected, only show rounds that have that stop
-    let filteredRoundIds = sortedRoundIds;
     if (filterStop) {
-        filteredRoundIds = sortedRoundIds.filter(rid => {
-            const stops = scheduleStops[rid] || [];
+        displayRows = displayRows.filter(row => {
+            const stops = scheduleStops[row.roundId] || [];
             return stops.some(s => s.name === filterStop);
         });
     }
+    
     if (filterStatus) {
-        filteredRoundIds = filteredRoundIds.filter(rid => {
-            const data = pivotMap[rid];
+        displayRows = displayRows.filter(row => {
+            if (row.isScheduledOnly) return false;
+            const data = pivotMap[row.pivotKey];
             if (!data) return false;
             return Object.values(data.stopData).some(s => s.status === filterStatus);
         });
     }
 
-    if (filteredRoundIds.length === 0) {
+    if (displayRows.length === 0) {
         container.innerHTML = `
             <div class="text-center py-16 text-gray-500">
                 <svg class="w-14 h-14 mx-auto mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,9 +252,10 @@ function renderHistoryTable() {
     // Table is dynamic per-round, not a global pivot.
 
     let html = '';
-    filteredRoundIds.forEach(roundId => {
+    displayRows.forEach(row => {
+        const roundId = row.roundId;
         const stops = scheduleStops[roundId] || [];
-        const roundData = pivotMap[roundId] || null;
+        const roundData = row.isScheduledOnly ? null : pivotMap[row.pivotKey];
         const roundNum = parseInt(roundId.replace(/\D/g, '')) || '?';
 
         // Determine overall round status
@@ -252,7 +275,7 @@ function renderHistoryTable() {
                 : `<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-900/40 text-green-400 border border-green-700/50">ตรงเวลา</span>`)
             : `<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gray-800 text-gray-400 border border-gray-600">รอข้อมูล</span>`;
 
-        const busDisplay = roundData ? `${roundData.busId} (${roundData.plateNumber})` : '-';
+        const busDisplay = roundData ? `${roundData.bus_id} (${roundData.plateNumber})` : '-';
         const driverDisplay = roundData ? roundData.driverName : '-';
         const progressText = stops.length > 0 ? `${arrivedCount}/${stops.length} ป้าย` : '-';
 
@@ -389,12 +412,44 @@ function updateSummaryStats() {
     const earlyEl = document.getElementById('stat-early');
     const roundsEl = document.getElementById('stat-rounds');
 
+    const filterBus = getFilterBus();
+    const filterStop = getFilterStop();
+    const filterStatus = getFilterStatus();
+
     let total = 0, onTime = 0, late = 0, early = 0;
     const rounds = new Set();
 
     allLogs.forEach(log => {
+        // Filter by bus
+        if (filterBus) {
+            const busRefId = log.bus_id || log.busId;
+            if (busRefId !== filterBus) return;
+        }
+
+        // Filter by stop
+        if (filterStop) {
+            let stopName = log.currentStop || log.stop_name || log.stopName;
+            const roundId = log.round_id || log.roundId;
+            if (log.scheduleTime && roundId) {
+                const stopsForRound = scheduleStops[roundId] || [];
+                const matchedStop = stopsForRound.find(s => s.scheduleTime === log.scheduleTime);
+                if (matchedStop) {
+                    stopName = matchedStop.name;
+                }
+            }
+            if (stopName !== filterStop) return;
+        }
+
+        // Filter by status
+        if (filterStatus) {
+            if (log.status !== filterStatus) return;
+        }
+
         total++;
-        rounds.add(log.round_id || log.roundId); // Fixed: proper round key
+        const roundId = log.round_id || log.roundId || 'unknown';
+        const busRefId = log.bus_id || log.busId || 'unknown';
+        rounds.add(`${roundId}_${busRefId}`);
+        
         if (log.status === 'ON_TIME') onTime++;
         else if (log.status === 'LATE') late++;
         else if (log.status === 'EARLY') early++;
@@ -412,6 +467,11 @@ function getSelectedDate() {
     const el = document.getElementById('historyDate');
     if (el && el.value) return el.value;
     return new Date().toISOString().split('T')[0];
+}
+
+function getFilterBus() {
+    const el = document.getElementById('busFilter');
+    return el ? el.value : '';
 }
 
 function getFilterStop() {
@@ -452,6 +512,7 @@ function updateDateDisplay() {
 
 function bindFilterEvents() {
     const dateEl = document.getElementById('historyDate');
+    const busEl = document.getElementById('busFilter');
     const stopEl = document.getElementById('stopFilter');
     const statusEl = document.getElementById('statusFilter');
 
@@ -461,8 +522,52 @@ function bindFilterEvents() {
             startHistoryListener(); // Re-listen with new date
         });
     }
-    if (stopEl) stopEl.addEventListener('change', () => renderHistoryTable());
-    if (statusEl) statusEl.addEventListener('change', () => renderHistoryTable());
+    if (busEl) {
+        busEl.addEventListener('change', () => {
+            renderHistoryTable();
+            updateSummaryStats();
+        });
+    }
+    if (stopEl) {
+        stopEl.addEventListener('change', () => {
+            renderHistoryTable();
+            updateSummaryStats();
+        });
+    }
+    if (statusEl) {
+        statusEl.addEventListener('change', () => {
+            renderHistoryTable();
+            updateSummaryStats();
+        });
+    }
+}
+
+function populateBusFilter() {
+    const el = document.getElementById('busFilter');
+    if (!el) return;
+    
+    // Clear existing options except first
+    while (el.options.length > 1) el.remove(1);
+    
+    const sortedBusIds = Object.keys(busesMap).sort((a, b) => {
+        const numA = busesMap[a].bus_id || busesMap[a].bus_number || busesMap[a].number || a;
+        const numB = busesMap[b].bus_id || busesMap[b].bus_number || busesMap[b].number || b;
+        return String(numA).localeCompare(String(numB), undefined, {numeric: true});
+    });
+
+    sortedBusIds.forEach(id => {
+        const bus = busesMap[id];
+        const opt = document.createElement('option');
+        opt.value = bus.bus_id || id;
+        
+        // Use the custom bus_id field (e.g. 'bus1', 'bus2') as the dropdown label
+        let label = bus.bus_id || id;
+        if (bus.license_plate || bus.plate_number) {
+            label += ` (${bus.license_plate || bus.plate_number})`;
+        }
+        opt.textContent = label;
+        el.appendChild(opt);
+    });
 }
 
 // ─── Populate stop filter from schedules ──────────────────────────────────────

@@ -245,7 +245,9 @@ function startLiveTracking() {
                 status: status,
                 nextStop: nextStop,
                 eta: eta,
-                speed: 0
+                speed: 0,
+                lastVisitedStop: data.last_visited_stop || null,
+                lastVisitedTime: data.last_visited_time || null
             };
 
             // Attach RTDB listener for actual live location
@@ -477,6 +479,22 @@ function calculateEta(busId) {
             }
         } else {
             nextStopIdx = nearestIdx;
+        }
+    }
+
+    // -- เงื่อนไขเพิ่มเติม: ตรวจสอบประวัติการถึงจุดจอด --
+    const lastVisitedStop = bus.metadata.lastVisitedStop;
+    const lastVisitedTime = bus.metadata.lastVisitedTime;
+    
+    if (lastVisitedStop && lastVisitedTime) {
+        // ถ้าระยะเวลายังไม่เกิน 30 นาที (ป้องกันการใช้ข้อมูลเก่าข้ามวันหรือรอบเก่ามากๆ)
+        const isRecent = (Date.now() - lastVisitedTime) < 30 * 60 * 1000;
+        if (isRecent) {
+            const lastIdx = orderedStops.findIndex(s => s.name === lastVisitedStop);
+            // ถ้าคำนวณแล้วสถานีถัดไปยังคงเป็นสถานีที่ระบบเพิ่งบันทึกว่าไปถึงแล้ว ให้บังคับข้ามเป็นสถานีถัดไป
+            if (lastIdx !== -1 && nextStopIdx <= lastIdx) {
+                nextStopIdx = lastIdx + 1;
+            }
         }
     }
 
