@@ -231,18 +231,21 @@ async function processBusMovement(busId, rawData) {
     // Fetch last visited stop state for sequence enforcement
     let lastVisitedStop = null;
     let lastVisitedTime = 0;
+    let lastVisitedRound = null;
     try {
         const busDoc = await db.collection('buses').doc(busId).get();
         if (busDoc.exists) {
             const d = busDoc.data();
             lastVisitedStop = d.last_visited_stop;
             lastVisitedTime = d.last_visited_time;
+            lastVisitedRound = d.last_visited_round;
         } else {
             const bQuery = await db.collection('buses').where('bus_id', '==', busId).get();
             if (!bQuery.empty) {
                 const d = bQuery.docs[0].data();
                 lastVisitedStop = d.last_visited_stop;
                 lastVisitedTime = d.last_visited_time;
+                lastVisitedRound = d.last_visited_round;
             }
         }
     } catch(e) {}
@@ -275,7 +278,8 @@ async function processBusMovement(busId, rawData) {
         
         if (currIdx !== -1 && expectedIdx !== -1) {
             let lastIdx = -1;
-            if (lastVisitedStop && lastVisitedTime && (Date.now() - lastVisitedTime < 60 * 60 * 1000)) {
+            // Only enforce sequence if we are still in the same round to prevent skipping backwards across rounds
+            if (lastVisitedRound === roundId && lastVisitedStop && lastVisitedTime && (Date.now() - lastVisitedTime < 60 * 60 * 1000)) {
                 lastIdx = stopsArray.findIndex(s => s.name === lastVisitedStop);
             }
             
@@ -362,14 +366,16 @@ async function processBusMovement(busId, rawData) {
             if (busDoc.exists) {
                 await db.collection('buses').doc(busId).update({
                     last_visited_stop: nearby.stopName,
-                    last_visited_time: Date.now()
+                    last_visited_time: Date.now(),
+                    last_visited_round: roundId
                 });
             } else {
                 const bQuery = await db.collection('buses').where('bus_id', '==', busId).get();
                 bQuery.forEach(async d => {
                     await d.ref.update({
                         last_visited_stop: nearby.stopName,
-                        last_visited_time: Date.now()
+                        last_visited_time: Date.now(),
+                        last_visited_round: roundId
                     });
                 });
             }
