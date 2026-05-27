@@ -20,7 +20,7 @@ let stopSequenceFromDB = []; // [{ order, name, lat, lng }] sorted by order
 // ─── ETA Constants ────────────────────────────────────────────────────────────
 const FALLBACK_SPEED_KMH = 20;     // ความเร็วเฉลี่ยภายในมหาวิทยาลัย (km/h)
 const ROAD_FACTOR = 1.3;           // ตัวคูณชดเชยเส้นทางจริง vs เส้นตรง
-const AT_STOP_THRESHOLD_M = 80;    // ระยะ (เมตร) ที่ถือว่าถึงป้ายแล้ว
+const AT_STOP_THRESHOLD_M = 50;    // ระยะ (เมตร) ที่ถือว่าถึงป้ายแล้ว
 const MOVING_THRESHOLD_KMH = 3;    // ความเร็วขั้นต่ำที่ถือว่ารถกำลังเคลื่อนที่
 
 // Reference coordinates for distance calculation from Firestore 'locations'

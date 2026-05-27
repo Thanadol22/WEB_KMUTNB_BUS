@@ -34,7 +34,7 @@ let schedulesCache = {}; // { roundId: [ { order, name, scheduleTime } ] }
 let lastArrivedCache = {}; // { busId_stopName: timestamp } — prevents duplicate recording at same stop
 let schedulesMetaCache = {}; // { roundId: { startTime, endTime } }
 
-const RADIUS_METERS = 80;
+const RADIUS_METERS = 50;
 const MASTER_REFRESH_INTERVAL = 5 * 60 * 1000; // Refresh master data every 5 minutes
 const STOP_TIME_WINDOW_MINS = 15; // Max time difference (minutes) between current time and stop.time to consider a match
 
