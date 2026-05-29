@@ -324,7 +324,6 @@ function renderBuses() {
                             </div>
                         </div>
                     </div>
-                    ${batteryDisplay}
                 </div>
                 
                 <div class="mb-4 text-xs flex flex-wrap gap-2 text-gray-500">
@@ -346,13 +345,6 @@ function renderBuses() {
                             <span class="text-xs font-semibold">พนักงานขับรถ</span>
                         </div>
                         <span class="text-sm font-bold text-gray-800">${bus.driverName}</span>
-                    </div>
-                    <div class="flex items-center justify-between border-t border-gray-200/50 pt-3">
-                        <div class="flex items-center space-x-2 text-gray-500">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                            <span class="text-xs font-semibold">แรงดันไฟฟ้า</span>
-                        </div>
-                        <span class="text-sm font-bold text-gray-800 font-mono">${bus.batteryVoltage ? bus.batteryVoltage + ' V' : '-'}</span>
                     </div>
                 </div>
 

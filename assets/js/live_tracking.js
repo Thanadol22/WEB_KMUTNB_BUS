@@ -1,6 +1,6 @@
 import { db, rtdb } from "./firebase-init.js";
 import { collection, onSnapshot, query as fsQuery, getDocs, where } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import { ref, query as dbQuery, limitToLast, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { ref, query as dbQuery, limitToLast, onValue, get } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
 // --- Status Normalization (shared across tracking views) ---
 const TRACKING_STATUS_MAP = {
@@ -215,7 +215,9 @@ function startLiveTracking() {
             if (!busesState[busId]) {
                 busesState[busId] = {
                     position: { lat: null, lng: null },
-                    rtdbAttached: false
+                    rtdbAttached: false,
+                    batteryPercent: null,
+                    batteryVoltage: null
                 };
             }
 
@@ -280,6 +282,30 @@ function startLiveTracking() {
                             // Get speed if available to calculate ETA
                             if (rtData.speed) {
                                 busesState[busId].metadata.speed = parseFloat(rtData.speed);
+                            }
+
+                            if (rtData.battery_percent !== undefined) {
+                                busesState[busId].batteryPercent = rtData.battery_percent;
+                            }
+                            if (rtData.battery_voltage !== undefined) {
+                                busesState[busId].batteryVoltage = rtData.battery_voltage;
+                            }
+
+                            // Fallback to monitoring if battery fields missing
+                            if (busesState[busId].batteryPercent === null || busesState[busId].batteryVoltage === null) {
+                                const monitorRef = ref(rtdb, "monitoring/" + rtdbBusId);
+                                get(monitorRef).then((monSnap) => {
+                                    if (monSnap.exists()) {
+                                        const mData = monSnap.val();
+                                        if (busesState[busId].batteryPercent === null && mData.battery_percent !== undefined) {
+                                            busesState[busId].batteryPercent = mData.battery_percent;
+                                        }
+                                        if (busesState[busId].batteryVoltage === null && mData.battery_voltage !== undefined) {
+                                            busesState[busId].batteryVoltage = mData.battery_voltage;
+                                        }
+                                        updateLiveMapAndList();
+                                    }
+                                }).catch(() => {});
                             }
 
                             busesState[busId].hasRtdbData = true;
@@ -612,29 +638,85 @@ function createBusCardHtml(id, driverName, driverPhone, plate, status, nextStop,
     const printEta = eta || '-';
     const displayId = busesState[id]?.metadata?.rtdbBusId || id;
 
+    // Battery percentage and voltage calculations
+    const bus = busesState[id] || {};
+    let batteryColor = 'text-gray-400';
+    let batteryIcon = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>';
+
+    if (bus.batteryPercent !== null && bus.batteryPercent !== undefined) {
+        if (bus.batteryPercent > 60) {
+            batteryColor = 'text-green-500';
+        } else if (bus.batteryPercent > 20) {
+            batteryColor = 'text-yellow-500';
+        } else {
+            batteryColor = 'text-red-500';
+        }
+
+        if (bus.batteryPercent > 80) {
+            batteryIcon = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 10V14C20 15.6569 18.6569 17 17 17H7C5.34315 17 4 15.6569 4 14V10C4 8.34315 5.34315 7 7 7H17C18.6569 7 20 8.34315 20 10ZM12 9V15M16 9V15M8 9V15"></path><path d="M22 11V13C22 13.5523 21.5523 14 21 14H20V10H21C21.5523 10 22 10.4477 22 11Z" fill="currentColor"></path>';
+        } else if (bus.batteryPercent > 40) {
+            batteryIcon = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 10V14C20 15.6569 18.6569 17 17 17H7C5.34315 17 4 15.6569 4 14V10C4 8.34315 5.34315 7 7 7H17C18.6569 7 20 8.34315 20 10ZM12 9V15M8 9V15"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 10V14"></path><path d="M22 11V13C22 13.5523 21.5523 14 21 14H20V10H21C21.5523 10 22 10.4477 22 11Z" fill="currentColor"></path>';
+        } else if (bus.batteryPercent > 10) {
+            batteryIcon = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 10V14C20 15.6569 18.6569 17 17 17H7C5.34315 17 4 15.6569 4 14V10C4 8.34315 5.34315 7 7 7H17C18.6569 7 20 8.34315 20 10ZM8 9V15"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 10V14"></path><path d="M22 11V13C22 13.5523 21.5523 14 21 14H20V10H21C21.5523 10 22 10.4477 22 11Z" fill="currentColor"></path>';
+        } else {
+            batteryIcon = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 10V14C20 15.6569 18.6569 17 17 17H7C5.34315 17 4 15.6569 4 14V10C4 8.34315 5.34315 7 7 7H17C18.6569 7 20 8.34315 20 10Z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 10V14"></path><path d="M22 11V13C22 13.5523 21.5523 14 21 14H20V10H21C21.5523 10 22 10.4477 22 11Z" fill="currentColor"></path>';
+        }
+    }
+
+    const batteryDisplay = (bus.batteryPercent !== null && bus.batteryPercent !== undefined)
+        ? `
+        <div class="relative w-14 h-14 shrink-0 select-none">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="16" fill="none" class="stroke-gray-100 dark:stroke-gray-700" stroke-width="3"></circle>
+                <circle cx="18" cy="18" r="16" fill="none" class="${batteryColor.replace('text-', 'stroke-')} transition-all duration-700" 
+                    stroke-width="3" stroke-dasharray="${bus.batteryPercent}, 100" stroke-linecap="round"></circle>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center -space-y-0.5">
+                <svg class="w-3.5 h-3.5 ${batteryColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    ${batteryIcon}
+                </svg>
+                <span class="text-[10px] font-black text-gray-800 dark:text-white">${bus.batteryPercent}%</span>
+            </div>
+        </div>`
+        : `
+        <div class="w-14 h-14 rounded-full border border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center text-[9px] text-gray-400 text-center font-medium shrink-0 select-none">
+            รอข้อมูล
+        </div>`;
+
+    const batteryVoltage = bus.batteryVoltage || null;
+    const voltageDisplay = batteryVoltage 
+        ? `
+        <div class="text-right shrink-0">
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">แรงดันไฟฟ้า</p>
+            <p class="text-sm font-bold text-gray-800 dark:text-gray-200 font-mono leading-tight mt-0.5">${batteryVoltage} V</p>
+        </div>`
+        : '';
+
     return `
         <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl border-2 ${borderColor} hover:shadow-lg transition-all cursor-pointer mb-4 relative overflow-hidden" onclick="focusBusOnMap('${id}')">
-            <div class="flex items-center space-x-4">
-                <!-- Circular Icon Left -->
-                <div class="w-14 h-14 rounded-full ${iconBg} border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-center shrink-0">
-                    <svg class="w-7 h-7 ${iconColor}" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M4 16c0 .88.39 1.67 1 2.22v1.28c0 .83.67 1.5 1.5 1.5S8 20.33 8 19.5V19h8v.5c0 .82.67 1.5 1.5 1.5.82 0 1.5-.68 1.5-1.5v-1.28c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z" />
-                    </svg>
-                </div>
-                
-                <!-- Content Right -->
-                <div class="flex-1 min-w-0">
-                    <!-- Top Row -->
-                    <div class="flex items-start justify-between">
+            <div class="flex items-center justify-between space-x-4">
+                <div class="flex items-center space-x-4 min-w-0">
+                    <!-- Circular Icon Left -->
+                    <div class="w-14 h-14 rounded-full ${iconBg} border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-center shrink-0">
+                        <svg class="w-7 h-7 ${iconColor}" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M4 16c0 .88.39 1.67 1 2.22v1.28c0 .83.67 1.5 1.5 1.5S8 20.33 8 19.5V19h8v.5c0 .82.67 1.5 1.5 1.5.82 0 1.5-.68 1.5-1.5v-1.28c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z" />
+                        </svg>
+                    </div>
+                    
+                    <!-- Content Right -->
+                    <div class="min-w-0">
                         <div class="flex flex-col">
                             <h4 class="text-gray-900 dark:text-white font-bold text-lg leading-tight truncate">${displayId}</h4>
                             <div class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">${plate}</div>
+                            <div class="mt-1.5">
+                                <span class="px-2.5 py-0.5 rounded-lg text-[10px] font-bold tracking-wide ${badgeColor} whitespace-nowrap">
+                                    ${printStatus}
+                                </span>
+                            </div>
                         </div>
-                        <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide ${badgeColor} whitespace-nowrap ml-2">
-                            ${printStatus}
-                        </span>
                     </div>
                 </div>
+                ${batteryDisplay}
             </div>
             
             <!-- Middle Row with ETA & Next Stop -->
@@ -656,11 +738,12 @@ function createBusCardHtml(id, driverName, driverPhone, plate, status, nextStop,
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                     </div>
                     <div class="truncate">
-                        <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">พนักงานขับรถ</p>
-                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">${driverName}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 truncate">${driverPhone}</p>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider leading-none mb-0.5">พนักงานขับรถ</p>
+                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate leading-tight">${driverName}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 truncate leading-none mt-0.5">${driverPhone}</p>
                     </div>
                 </div>
+                ${voltageDisplay}
             </div>
         </div>
     `;

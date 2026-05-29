@@ -3,8 +3,8 @@ date_default_timezone_set("Asia/Bangkok");
 ?>
 
 <div class="mb-6">
-    <h1 class="text-2xl sm:text-3xl font-bold text-primary">จัดการรถและตรวจสอบสถานะแบตเตอรี่</h1>
-    <p class="text-gray-400 mt-2">ดูรายละเอียดรถทั้งหมด และสถานะแบตเตอรี่แบบเรียลไทม์จากระบบเซ็นเซอร์</p>
+    <h1 class="text-2xl sm:text-3xl font-bold text-primary">จัดการรถ</h1>
+    <p class="text-gray-400 mt-2">ดูรายละเอียดและจัดการข้อมูลรถทั้งหมดในระบบ</p>
 </div>
 
 <!-- Container for buses -->

@@ -9,6 +9,7 @@ let scheduleStops = {};    // { roundId: [ { order, name, scheduleTime }, ... ] 
 let driversMap = {};       // map of driver_id -> user
 let busesMap = {};         // map of bus_id -> bus details
 let unsubscribeHistory = null;
+let selectedRounds = new Set(); // set of selected roundIds
 
 // Helper: find bus data by bus_id field (daemon records RTDB key as bus_id)
 function findBusByBusId(busId) {
@@ -65,6 +66,7 @@ async function loadDetailedSchedules() {
             }
         });
         console.log("[History] Schedules loaded:", Object.keys(scheduleStops).length, "rounds");
+        populateRoundFilter();
     } catch (e) {
         console.error("[History] Failed to load schedules:", e);
     }
@@ -119,7 +121,6 @@ function renderHistoryTable() {
     if (!container) return;
 
     const filterBus = getFilterBus();
-    const filterStop = getFilterStop();
     const filterStatus = getFilterStatus();
 
     // Group logs by roundId AND busId to prevent mixing logs from different buses
@@ -214,11 +215,8 @@ function renderHistoryTable() {
         return a.pivotKey.localeCompare(b.pivotKey);
     });
 
-    if (filterStop) {
-        displayRows = displayRows.filter(row => {
-            const stops = scheduleStops[row.roundId] || [];
-            return stops.some(s => s.name === filterStop);
-        });
+    if (selectedRounds.size > 0) {
+        displayRows = displayRows.filter(row => selectedRounds.has(row.roundId));
     }
     
     if (filterStatus) {
@@ -404,7 +402,6 @@ function buildStopCell(stop, log, idx, total) {
     `;
 }
 
-// ─── Summary Stats ─────────────────────────────────────────────────────────────
 function updateSummaryStats() {
     const totalEl = document.getElementById('stat-total-arrivals');
     const onTimeEl = document.getElementById('stat-on-time');
@@ -413,7 +410,6 @@ function updateSummaryStats() {
     const roundsEl = document.getElementById('stat-rounds');
 
     const filterBus = getFilterBus();
-    const filterStop = getFilterStop();
     const filterStatus = getFilterStatus();
 
     let total = 0, onTime = 0, late = 0, early = 0;
@@ -426,18 +422,10 @@ function updateSummaryStats() {
             if (busRefId !== filterBus) return;
         }
 
-        // Filter by stop
-        if (filterStop) {
-            let stopName = log.currentStop || log.stop_name || log.stopName;
+        // Filter by round
+        if (selectedRounds.size > 0) {
             const roundId = log.round_id || log.roundId;
-            if (log.scheduleTime && roundId) {
-                const stopsForRound = scheduleStops[roundId] || [];
-                const matchedStop = stopsForRound.find(s => s.scheduleTime === log.scheduleTime);
-                if (matchedStop) {
-                    stopName = matchedStop.name;
-                }
-            }
-            if (stopName !== filterStop) return;
+            if (!selectedRounds.has(roundId)) return;
         }
 
         // Filter by status
@@ -471,11 +459,6 @@ function getSelectedDate() {
 
 function getFilterBus() {
     const el = document.getElementById('busFilter');
-    return el ? el.value : '';
-}
-
-function getFilterStop() {
-    const el = document.getElementById('stopFilter');
     return el ? el.value : '';
 }
 
@@ -513,7 +496,6 @@ function updateDateDisplay() {
 function bindFilterEvents() {
     const dateEl = document.getElementById('historyDate');
     const busEl = document.getElementById('busFilter');
-    const stopEl = document.getElementById('stopFilter');
     const statusEl = document.getElementById('statusFilter');
 
     if (dateEl) {
@@ -528,16 +510,28 @@ function bindFilterEvents() {
             updateSummaryStats();
         });
     }
-    if (stopEl) {
-        stopEl.addEventListener('change', () => {
-            renderHistoryTable();
-            updateSummaryStats();
-        });
-    }
     if (statusEl) {
         statusEl.addEventListener('change', () => {
             renderHistoryTable();
             updateSummaryStats();
+        });
+    }
+
+    // Bind Round Multiselect Dropdown events
+    const multiselectBtn = document.getElementById('roundMultiselectBtn');
+    const multiselectDropdown = document.getElementById('roundMultiselectDropdown');
+    
+    if (multiselectBtn && multiselectDropdown) {
+        multiselectBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            multiselectDropdown.classList.toggle('hidden');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#round-multiselect-container')) {
+                multiselectDropdown.classList.add('hidden');
+            }
         });
     }
 }
@@ -570,34 +564,65 @@ function populateBusFilter() {
     });
 }
 
-// ─── Populate stop filter from schedules ──────────────────────────────────────
-// Make stop list available globally for PHP to (or do it here in JS)
-window.populateStopFilter = function (stopNames) {
-    const el = document.getElementById('stopFilter');
-    if (!el) return;
-    stopNames.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        el.appendChild(opt);
+// ─── Populate round filter from schedules ──────────────────────────────────────
+function populateRoundFilter() {
+    const dropdown = document.getElementById('roundMultiselectDropdown');
+    if (!dropdown) return;
+    
+    dropdown.innerHTML = '';
+    selectedRounds.clear();
+    const label = document.getElementById('roundSelectedLabel');
+    if (label) label.textContent = "ทุกรอบวิ่ง";
+    
+    const roundIds = Object.keys(scheduleStops).sort((a, b) => {
+        const numA = parseInt(a.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.replace(/\D/g, '')) || 0;
+        return numA - numB;
     });
-};
 
-// Auto-populate stop filter from scheduleStops after load
-setTimeout(() => {
-    const allStopNames = new Set();
-    Object.values(scheduleStops).forEach(stops => {
-        stops.forEach(s => { if (s.name) allStopNames.add(s.name); });
-    });
-    const el = document.getElementById('stopFilter');
-    if (el && allStopNames.size > 0) {
-        // Clear existing options except first
-        while (el.options.length > 1) el.remove(1);
-        [...allStopNames].sort().forEach(name => {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
-            el.appendChild(opt);
-        });
+    if (roundIds.length === 0) {
+        dropdown.innerHTML = '<div class="text-xs text-gray-500 p-2">ไม่มีข้อมูลรอบวิ่ง</div>';
+        return;
     }
-}, 3000); // Wait for schedules to load
+
+    roundIds.forEach(rid => {
+        const num = parseInt(rid.replace(/\D/g, '')) || rid;
+        const item = document.createElement('label');
+        item.className = "flex items-center space-x-2 p-1.5 hover:bg-gray-800 rounded-md cursor-pointer text-sm text-gray-300 select-none";
+        item.innerHTML = `
+            <input type="checkbox" value="${rid}" class="round-checkbox w-4 h-4 text-primary bg-gray-800 border-gray-700 rounded focus:ring-primary">
+            <span>รอบที่ ${num}</span>
+        `;
+        dropdown.appendChild(item);
+    });
+
+    // Add event listeners to checkboxes
+    const checkboxes = dropdown.querySelectorAll('.round-checkbox');
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            if (cb.checked) {
+                selectedRounds.add(cb.value);
+            } else {
+                selectedRounds.delete(cb.value);
+            }
+            updateRoundLabel();
+            renderHistoryTable();
+            updateSummaryStats();
+        });
+    });
+}
+
+function updateRoundLabel() {
+    const label = document.getElementById('roundSelectedLabel');
+    if (!label) return;
+    
+    if (selectedRounds.size === 0) {
+        label.textContent = "ทุกรอบวิ่ง";
+    } else if (selectedRounds.size === 1) {
+        const rid = [...selectedRounds][0];
+        const num = parseInt(rid.replace(/\D/g, '')) || rid;
+        label.textContent = `รอบที่ ${num}`;
+    } else {
+        label.textContent = `เลือกแล้ว ${selectedRounds.size} รอบ`;
+    }
+}

@@ -66,16 +66,22 @@ $today = date("Y-m-d");
             </select>
         </div>
 
-        <!-- Stop Filter -->
-        <div class="flex items-center gap-2">
+        <!-- Round Multi-Select Filter -->
+        <div class="flex items-center gap-2 relative">
             <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            <select id="stopFilter" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5">
-                <option value="">ทุกป้ายจอด</option>
-                <!-- populated by JS from scheduleStops -->
-            </select>
+            <div class="relative" id="round-multiselect-container">
+                <button type="button" id="roundMultiselectBtn" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg focus:ring-primary focus:border-primary flex items-center justify-between p-2.5 min-w-[140px] text-left">
+                    <span id="roundSelectedLabel">ทุกรอบวิ่ง</span>
+                    <svg class="w-4 h-4 ml-2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div id="roundMultiselectDropdown" class="absolute left-0 mt-1 w-56 bg-gray-900 border border-gray-700 rounded-lg shadow-xl hidden z-20 max-h-60 overflow-y-auto p-2 space-y-1">
+                    <!-- populated dynamically with checkboxes by JS -->
+                </div>
+            </div>
         </div>
 
         <!-- Status Filter -->
