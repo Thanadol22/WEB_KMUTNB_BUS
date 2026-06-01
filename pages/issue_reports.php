@@ -123,7 +123,7 @@ foreach ($issues as $issue) {
             <thead class="bg-gray-800 text-xs uppercase text-gray-400 border-b border-gray-700">
                 <tr>
                     <th class="px-6 py-4 font-medium whitespace-nowrap">เวลาที่แจ้ง</th>
-                    <th class="px-6 py-4 font-medium whitespace-nowrap">ผู้แจ้ง (Student ID)</th>
+                    <th class="px-6 py-4 font-medium whitespace-nowrap">ผู้แจ้ง</th>
                     <th class="px-6 py-4 font-medium min-w-[150px]">หัวข้อปัญหา</th>
                     <th class="px-6 py-4 font-medium min-w-[200px] w-1/3">รายละเอียด</th>
                     <th class="px-6 py-4 font-medium whitespace-nowrap">สถานะ</th>
@@ -233,7 +233,7 @@ foreach ($issues as $issue) {
             
             <div>
                 <label class="block text-gray-400 text-sm font-medium mb-1">หัวข้อปัญหา</label>
-                <div id="modalTopic" class="text-white bg-gray-800/50 p-3 rounded-lg border border-gray-700"></div>
+                <div id="modalTopic" class="p-3 rounded-lg border <?php echo $isDarkMode ? 'text-white bg-gray-800/50 border-gray-700' : 'text-gray-900 bg-white border-gray-300'; ?>"></div>
             </div>
             
             <div class="grid grid-cols-2 gap-4">
@@ -249,7 +249,7 @@ foreach ($issues as $issue) {
             
             <div>
                 <label class="block text-gray-400 text-sm font-medium mb-1">รายละเอียดเพิ่มเติม</label>
-                <div id="modalDesc" class="text-gray-300 bg-gray-800/50 p-3 rounded-lg border border-gray-700 whitespace-pre-wrap text-sm min-h-[100px]"></div>
+                <div id="modalDesc" class="p-3 rounded-lg border whitespace-pre-wrap text-sm min-h-[100px] <?php echo $isDarkMode ? 'text-gray-300 bg-gray-800/50 border-gray-700' : 'text-gray-800 bg-white border-gray-300'; ?>"></div>
             </div>
             
             <div class="pt-4 border-t border-gray-700">

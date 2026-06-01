@@ -31,20 +31,46 @@ if (searchInput) {
     });
 }
 
+const userRoleSelect = document.getElementById('userRole');
+if (userRoleSelect) {
+    userRoleSelect.addEventListener('change', (e) => {
+        if (e.target.value === 'driver') {
+            closeUserModal();
+            openDriverModal(null);
+        }
+    });
+}
+
 if (filterContainer) {
     filterContainer.addEventListener('click', (e) => {
         const btn = e.target.closest('.filter-btn');
         if (!btn) return;
         
+        const roleActiveClasses = {
+            all: ['bg-gradient-to-r', 'from-indigo-600', 'to-indigo-500', 'text-white', 'border-indigo-500', 'shadow-[0_0_15px_rgba(79,70,229,0.4)]', 'scale-105'],
+            user: ['bg-gradient-to-r', 'from-orange-500', 'to-amber-500', 'text-white', 'border-orange-500', 'shadow-[0_0_15px_rgba(249,115,22,0.4)]', 'scale-105'],
+            admin: ['bg-gradient-to-r', 'from-blue-600', 'to-cyan-500', 'text-white', 'border-blue-500', 'shadow-[0_0_15px_rgba(37,99,235,0.4)]', 'scale-105'],
+            driver: ['bg-gradient-to-r', 'from-emerald-600', 'to-green-500', 'text-white', 'border-emerald-500', 'shadow-[0_0_15px_rgba(16,185,129,0.4)]', 'scale-105']
+        };
+
+        const inactiveClasses = ['bg-transparent', 'text-gray-500', 'border-transparent', 'hover:bg-gray-100'];
+        const commonActiveClasses = ['active-filter'];
+
         // Update active class
         const allBtns = filterContainer.querySelectorAll('.filter-btn');
         allBtns.forEach(b => {
-            b.classList.remove('bg-gray-800', 'text-white', 'border-gray-600', 'active-filter');
-            b.classList.add('bg-transparent', 'text-gray-400', 'border-transparent');
+            const role = b.dataset.role;
+            const activeClasses = roleActiveClasses[role] || [];
+            
+            b.classList.remove(...activeClasses, ...commonActiveClasses, 'scale-105');
+            b.classList.add(...inactiveClasses);
         });
         
-        btn.classList.remove('bg-transparent', 'text-gray-400', 'border-transparent');
-        btn.classList.add('bg-gray-800', 'text-white', 'border-gray-600', 'active-filter');
+        // Apply active to selected button
+        const activeRole = btn.dataset.role;
+        const activeClasses = roleActiveClasses[activeRole] || [];
+        btn.classList.remove(...inactiveClasses);
+        btn.classList.add(...activeClasses, ...commonActiveClasses);
         
         currentRoleFilter = btn.dataset.role;
         applyFilters();
@@ -60,19 +86,22 @@ function applyFilters() {
     
     if (currentRoleFilter === 'driver') {
         if (sInput) sInput.placeholder = "ค้นหาชื่อ, เบอร์โทร...";
-        if (addBtn) {
-            addBtn.innerHTML = `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> เพิ่มพนักงานขับรถ`;
-        }
     } else {
-        if (sInput) sInput.placeholder = "ค้นหาชื่อ, รหัสนักศึกษา...";
-        if (addBtn) {
-            addBtn.innerHTML = `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> เพิ่มผู้ใช้ใหม่`;
-        }
+        if (sInput) sInput.placeholder = "ค้นหาชื่อ, รหัสผู้ใช้...";
+    }
+
+    if (addBtn) {
+        addBtn.classList.remove('hidden');
+        addBtn.innerHTML = `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> เพิ่มผู้ใช้ใหม่`;
     }
 
     // Filter by role
     if (currentRoleFilter !== 'all') {
-        filteredUsers = filteredUsers.filter(u => u.role === currentRoleFilter);
+        if (currentRoleFilter === 'user') {
+            filteredUsers = filteredUsers.filter(u => u.role === 'user' || u.role === 'student' || u.role === 'teacher');
+        } else {
+            filteredUsers = filteredUsers.filter(u => u.role === currentRoleFilter);
+        }
     }
     
     // Filter by search query
@@ -368,8 +397,8 @@ function renderTable(users) {
             const license = allLicenses[driver.id] || {};
             
             let statusText = driver.status === 'inactive' ? 
-                 '<span class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full border border-red-700 whitespace-nowrap inline-block">ปิดใช้งาน</span>' : 
-                 '<span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-700 whitespace-nowrap inline-block">พร้อมบริการ</span>';
+                 '<span class="text-red-400">ปิดใช้งาน</span>' : 
+                 '<span class="text-green-400">ใช้งานแล้ว</span>';
             
             const profileImg = driver.profile_image_url ? 
                 `<img src="${driver.profile_image_url}" class="w-10 h-10 rounded-full object-cover border border-gray-600">` : 
@@ -456,14 +485,14 @@ function renderTable(users) {
         
         tbody.innerHTML = users.map(user => {
             let roleText = '';
-            if (user.role === 'student') {
-                roleText = '<span class="bg-blue-900/50 text-white py-1 px-2 text-xs rounded-full border border-blue-700 whitespace-nowrap inline-block">นักศึกษา</span>';
-            } else if (user.role === 'teacher') {
-                roleText = '<span class="bg-amber-900/50 text-white py-1 px-2 text-xs rounded-full border border-amber-700 whitespace-nowrap inline-block">อาจารย์</span>';
+            if (user.role === 'user' || user.role === 'student' || user.role === 'teacher') {
+                roleText = '<span class="bg-gradient-to-r from-orange-500 to-amber-500 text-white py-1 px-3 text-xs font-bold rounded-full whitespace-nowrap inline-flex items-center shadow-[0_3px_10px_rgba(249,115,22,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_4px_16px_rgba(249,115,22,0.6)]"><span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse"></span>ผู้ใช้งาน</span>';
             } else if (user.role === 'driver') {
-                roleText = '<span class="bg-green-900/50 text-white py-1 px-2 text-xs rounded-full border border-green-700 whitespace-nowrap inline-block">พนักงานขับรถ</span>';
+                roleText = '<span class="bg-gradient-to-r from-emerald-600 to-green-500 text-white py-1 px-3 text-xs font-bold rounded-full whitespace-nowrap inline-flex items-center shadow-[0_3px_10px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_4px_16px_rgba(16,185,129,0.6)]"><span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse"></span>พนักงานขับรถ</span>';
+            } else if (user.role === 'admin') {
+                roleText = '<span class="bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-1 px-3 text-xs font-bold rounded-full whitespace-nowrap inline-flex items-center shadow-[0_3px_10px_rgba(37,99,235,0.4)] transition-all duration-300 hover:scale-105 hover:shadow-[0_4px_16px_rgba(37,99,235,0.6)]"><span class="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse"></span>ผู้ดูแลระบบ</span>';
             } else {
-                roleText = `<span class="bg-purple-900/50 text-white py-1 px-2 text-xs rounded-full border border-purple-700 whitespace-nowrap inline-block">${user.role === 'admin' ? 'ผู้ดูแลระบบ' : (user.role || '-')}</span>`;
+                roleText = `<span class="bg-gray-800 text-gray-300 py-1 px-2.5 text-xs font-medium rounded-full border border-gray-700 whitespace-nowrap inline-block">${user.role || '-'}</span>`;
             }
                 
             let statusText = user.status === 'inactive' ? 
@@ -509,7 +538,11 @@ function openUserModal(uid = null) {
         
         const user = allUsers.find(u => u.id === uid);
         if (user) {
-            document.getElementById('userRole').value = user.role || 'student';
+            let roleVal = user.role || 'user';
+            if (roleVal === 'student' || roleVal === 'teacher') {
+                roleVal = 'user';
+            }
+            document.getElementById('userRole').value = roleVal;
             document.getElementById('userName').value = user.name || '';
             document.getElementById('userUsername').value = user.username || '';
             document.getElementById('userPassword').value = user.password || '';

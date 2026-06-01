@@ -24,6 +24,17 @@ class FirebaseService {
      * Get a collection via REST
      */
     public function getAllDocuments($collectionName) {
+        $cacheDuration = 10; // Cache for 10 seconds
+        $cacheKey = 'firebase_cache_' . $collectionName;
+        
+        if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION)) {
+            if (isset($_SESSION[$cacheKey]) && 
+                isset($_SESSION[$cacheKey . '_time']) && 
+                (time() - $_SESSION[$cacheKey . '_time']) < $cacheDuration) {
+                return $_SESSION[$cacheKey];
+            }
+        }
+
         try {
             $data = [];
             $pageToken = null;
@@ -50,6 +61,11 @@ class FirebaseService {
                 $pageToken = $body['nextPageToken'] ?? null;
             } while ($pageToken);
 
+            if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION)) {
+                $_SESSION[$cacheKey] = $data;
+                $_SESSION[$cacheKey . '_time'] = time();
+            }
+
             return $data;
         } catch (Exception $e) {
             return [];
@@ -60,6 +76,11 @@ class FirebaseService {
      * Save/Update a document via REST
      */
     public function saveDocument($collection, $uid, $data) {
+        if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION)) {
+            unset($_SESSION['firebase_cache_' . $collection]);
+            unset($_SESSION['firebase_cache_' . $collection . '_time']);
+        }
+
         try {
             $fields = $this->prepareFirestoreFields($data);
             $body = ['fields' => $fields];
@@ -79,6 +100,11 @@ class FirebaseService {
      * Delete a document via REST
      */
     public function deleteDocument($collection, $uid) {
+        if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION)) {
+            unset($_SESSION['firebase_cache_' . $collection]);
+            unset($_SESSION['firebase_cache_' . $collection . '_time']);
+        }
+
         try {
             $this->client->delete($collection . '/' . $uid);
             return true;

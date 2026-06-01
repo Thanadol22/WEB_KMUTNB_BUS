@@ -6,15 +6,16 @@ global $firebaseService;
 $users = $firebaseService->getAllDocuments('users');
 $totalUsers = count($users);
 $roleCounts = [
-    'student' => 0,
+    'user' => 0,
     'driver' => 0,
-    'admin' => 0,
-    'teacher' => 0
+    'admin' => 0
 ];
 
 foreach ($users as $user) {
     $role = $user['role'] ?? 'unknown';
-    if (isset($roleCounts[$role])) {
+    if ($role === 'student' || $role === 'teacher' || $role === 'user') {
+        $roleCounts['user']++;
+    } elseif (isset($roleCounts[$role])) {
         $roleCounts[$role]++;
     }
 }
@@ -59,19 +60,19 @@ foreach ($buses as $bus) {
         <div class="text-sm text-blue-400 mt-2">ลงทะเบียนใช้งานแล้ว</div>
     </div>
 
-    <!-- Students -->
+    <!-- General Users -->
     <div class="bg-cardbg stagger-2 p-6 rounded-2xl shadow-lg border border-gray-700 hover:border-primary/50 transition-all group overflow-hidden relative">
         <div class="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>
         </div>
         <div class="flex items-center mb-4">
-            <div class="p-3 rounded-lg bg-indigo-500/20 text-indigo-400 mr-4">
+            <div class="p-3 rounded-lg bg-orange-500/20 text-orange-400 mr-4">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
             </div>
-            <h3 class="text-gray-400 font-medium">นักศึกษา</h3>
+            <h3 class="text-gray-400 font-medium">ผู้ใช้งาน</h3>
         </div>
-        <div class="text-3xl font-bold"><?php echo number_format($roleCounts['student']); ?></div>
-        <div class="text-sm text-indigo-400 mt-2">Active Students</div>
+        <div class="text-3xl font-bold"><?php echo number_format($roleCounts['user']); ?></div>
+        <div class="text-sm text-orange-400 mt-2">Active Users</div>
     </div>
 
     <!-- Drivers -->
@@ -80,13 +81,13 @@ foreach ($buses as $bus) {
             <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
         </div>
         <div class="flex items-center mb-4">
-            <div class="p-3 rounded-lg bg-orange-500/20 text-orange-400 mr-4">
+            <div class="p-3 rounded-lg bg-emerald-500/20 text-emerald-400 mr-4">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"></path></svg>
             </div>
             <h3 class="text-gray-400 font-medium">คนขับรถ</h3>
         </div>
         <div class="text-3xl font-bold"><?php echo number_format($roleCounts['driver']); ?></div>
-        <div class="text-sm text-orange-400 mt-2">Active Drivers</div>
+        <div class="text-sm text-emerald-400 mt-2">Active Drivers</div>
     </div>
 
     <!-- Active Buses -->
@@ -118,10 +119,9 @@ foreach ($buses as $bus) {
             $max = max($roleCounts);
             if ($max == 0) $max = 1;
             $items = [
-                ['label' => 'นักศึกษา', 'val' => $roleCounts['student'], 'color' => 'bg-indigo-500'],
-                ['label' => 'อาจารย์', 'val' => $roleCounts['teacher'], 'color' => 'bg-amber-500'],
-                ['label' => 'คนขับรถ', 'val' => $roleCounts['driver'], 'color' => 'bg-orange-500'],
-                ['label' => 'แอดมิน', 'val' => $roleCounts['admin'], 'color' => 'bg-primary']
+                ['label' => 'ผู้ใช้งาน', 'val' => $roleCounts['user'], 'color' => 'bg-gradient-to-r from-orange-500 to-amber-500'],
+                ['label' => 'คนขับรถ', 'val' => $roleCounts['driver'], 'color' => 'bg-gradient-to-r from-emerald-600 to-green-500'],
+                ['label' => 'แอดมิน', 'val' => $roleCounts['admin'], 'color' => 'bg-gradient-to-r from-blue-600 to-cyan-500']
             ];
             foreach($items as $item): 
                 $h = ($item['val'] / $max) * 100;

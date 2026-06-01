@@ -1,6 +1,10 @@
 <?php
 session_start();
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        header('HTTP/1.1 401 Unauthorized');
+        exit();
+    }
     header("Location: login.php");
     exit();
 }
@@ -15,6 +19,21 @@ $webConfig = getFirebaseWebConfig();
 // Theme logic
 $theme = $_COOKIE['theme'] ?? 'light'; // Default to light mode
 $isDarkMode = ($theme === 'dark');
+
+// Handle AJAX dynamic page routing (SPA Mode)
+if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+    $page = isset($_GET['page']) ? preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['page']) : 'dashboard';
+    $pagePath = "pages/{$page}.php";
+    
+    header('Content-Type: text/html; charset=UTF-8');
+    
+    if (file_exists($pagePath)) {
+        include $pagePath;
+    } else {
+        echo "<div class='text-center mt-20'><h2 class='text-2xl text-red-500'>404 Page Not Found</h2><p class='text-gray-400 mt-2'>The requested page `" . htmlspecialchars($page) . "` does not exist.</p></div>";
+    }
+    exit();
+}
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -143,6 +162,10 @@ $isDarkMode = ($theme === 'dark');
         .bg-yellow-500\/20 { background-color: #fef9c3 !important; color: #a16207 !important; }
         
         .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02) !important; }
+        
+        #main-page-content {
+            transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
         <?php endif; ?>
     </style>
     
@@ -152,6 +175,9 @@ $isDarkMode = ($theme === 'dark');
     </script>
 </head>
 <body class="bg-darkbg text-white font-sans antialiased">
+    
+    <!-- Sleek Top-Bar Progress Indicator -->
+    <div id="top-loading-bar" class="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-accent to-primary z-[99999] transition-all duration-300 ease-out opacity-0 pointer-events-none" style="width: 0%;"></div>
     
     <!-- Global Page Loader Overlay -->
     <div id="global-page-loader" class="fixed inset-0 z-[9999] flex items-center justify-center bg-darkbg transition-opacity duration-300">
@@ -172,6 +198,20 @@ $isDarkMode = ($theme === 'dark');
     </div>
     
     <script>
+        // --- Intercept DOMContentLoaded for AJAX SPA Compatibility ---
+        (function() {
+            const originalAddEventListener = document.addEventListener;
+            document.addEventListener = function(type, listener, options) {
+                if (type === 'DOMContentLoaded') {
+                    if (document.readyState === 'interactive' || document.readyState === 'complete') {
+                        setTimeout(listener, 10);
+                        return;
+                    }
+                }
+                return originalAddEventListener.call(this, type, listener, options);
+            };
+        })();
+
         // Handle global page loader transitions
         window.addEventListener('load', function() {
             const loader = document.getElementById('global-page-loader');
@@ -183,30 +223,179 @@ $isDarkMode = ($theme === 'dark');
             }
         });
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const navLinks = document.querySelectorAll('a[href^="?page="], a[href^="index.php"]');
-            navLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
-                    if (e.ctrlKey || e.metaKey || this.target === '_blank') return;
-                    
-                    const loader = document.getElementById('global-page-loader');
-                    if (loader) {
-                        loader.style.display = 'flex';
-                        // Force reflow
-                        void loader.offsetWidth;
-                        loader.style.opacity = '1';
+        // Fallback timeout for initial loader
+        setTimeout(() => {
+            const loader = document.getElementById('global-page-loader');
+            if (loader && loader.style.display !== 'none') {
+                loader.style.opacity = '0';
+                setTimeout(() => { loader.style.display = 'none'; }, 300);
+            }
+        }, 8000);
+
+        // --- Dynamic SPA Navigation Logic ---
+        async function loadPageDynamic(url, pushToHistory = true) {
+            const contentArea = document.getElementById('main-page-content');
+            const loader = document.getElementById('global-page-loader');
+            
+            // Extract page name
+            let pageKey = 'dashboard';
+            try {
+                const urlObj = new URL(url, window.location.origin);
+                pageKey = urlObj.searchParams.get('page') || 'dashboard';
+            } catch (e) {
+                // If parsing fails, extract using regex
+                const match = url.match(/[?&]page=([^&]+)/);
+                if (match) pageKey = match[1];
+            }
+            
+            // 1. Show Global Page Loader Overlay immediately
+            if (loader) {
+                loader.style.display = 'flex';
+                void loader.offsetWidth;
+                loader.style.opacity = '1';
+            }
+            
+            // 2. Animate content area out smoothly
+            if (contentArea) {
+                contentArea.style.opacity = '0';
+                contentArea.style.transform = 'translateY(10px)';
+            }
+            
+            try {
+                // Fetch dynamic HTML page
+                const response = await fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
                 });
-            });
-            
-            // Fallback timeout
-            setTimeout(() => {
-                const loader = document.getElementById('global-page-loader');
-                if (loader && loader.style.display !== 'none') {
-                    loader.style.opacity = '0';
-                    setTimeout(() => { loader.style.display = 'none'; }, 300);
+                
+                if (!response.ok) throw new Error('Dynamic request returned non-OK response');
+                
+                const html = await response.text();
+                
+                // 3. Swap Content
+                if (contentArea) {
+                    contentArea.innerHTML = html;
                 }
-            }, 10000);
+                
+                // 4. Update History State if requested
+                if (pushToHistory) {
+                    history.pushState({ page: pageKey, url: url }, '', url);
+                }
+                
+                // 5. Update Active Sidebar Link styles
+                updateActiveSidebarLink(pageKey);
+                
+                // 6. Dynamically parse and execute script tags
+                executeScriptsInContent(contentArea);
+                
+                // 7. Hide Global Page Loader Overlay
+                if (loader) {
+                    // Small timeout to guarantee visual transition smoothness
+                    setTimeout(() => {
+                        loader.style.opacity = '0';
+                        setTimeout(() => { loader.style.display = 'none'; }, 300);
+                    }, 100);
+                }
+                
+                // 8. Animate content area back in
+                if (contentArea) {
+                    setTimeout(() => {
+                        contentArea.style.opacity = '1';
+                        contentArea.style.transform = 'translateY(0)';
+                    }, 150);
+                }
+                
+                // Scroll page back to top
+                const mainEl = document.querySelector('main');
+                if (mainEl) mainEl.scrollTop = 0;
+                
+                // 9. Auto-close mobile sidebar if open
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+                    toggleSidebar();
+                }
+                
+            } catch (error) {
+                console.warn('Dynamic navigation failed, falling back to full load:', error);
+                // Fallback to standard page load
+                window.location.href = url;
+            }
+        }
+
+        // Helper to extract and run scripts dynamically in global scope
+        function executeScriptsInContent(container) {
+            if (!container) return;
+            const scripts = container.querySelectorAll('script');
+            scripts.forEach(oldScript => {
+                const newScript = document.createElement('script');
+                Array.from(oldScript.attributes).forEach(attr => {
+                    newScript.setAttribute(attr.name, attr.value);
+                });
+                if (oldScript.src) {
+                    newScript.src = oldScript.src;
+                } else {
+                    newScript.text = oldScript.textContent;
+                }
+                // Append script to trigger loading/execution
+                document.body.appendChild(newScript);
+            });
+        }
+
+        // Helper to update active link styling in Sidebar
+        function updateActiveSidebarLink(activePage) {
+            const sidebar = document.getElementById('sidebar');
+            if (!sidebar) return;
+            
+            const links = sidebar.querySelectorAll('a[href*="page="]');
+            links.forEach(link => {
+                let page = null;
+                try {
+                    const url = new URL(link.href, window.location.origin);
+                    page = url.searchParams.get('page');
+                } catch(e) {
+                    const match = link.href.match(/[?&]page=([^&]+)/);
+                    if (match) page = match[1];
+                }
+                
+                const isActive = (page === activePage);
+                
+                // Reset classes
+                link.className = "flex items-center px-4 py-3 rounded-lg transition-all duration-300 group hover:pl-5";
+                
+                if (isActive) {
+                    link.className += " bg-primary text-white";
+                } else {
+                    link.className += " text-gray-400 hover:bg-gray-800 hover:text-white";
+                }
+            });
+        }
+
+        // Intercept global link clicks
+        document.addEventListener('click', function(e) {
+            // Find closest anchor tag
+            const anchor = e.target.closest('a');
+            if (!anchor) return;
+            
+            const href = anchor.getAttribute('href');
+            if (!href) return;
+            
+            // Check if it is a system navigation link (e.g. ?page=... or index.php?page=...)
+            const isSystemNav = href.startsWith('?page=') || href.startsWith('index.php?page=');
+            
+            // Check standard browser modifier keys (Ctrl/Cmd click to open in new tab)
+            const isModifier = e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1;
+            const isTargetBlank = anchor.target === '_blank';
+            
+            if (isSystemNav && !isModifier && !isTargetBlank) {
+                e.preventDefault();
+                loadPageDynamic(href);
+            }
+        });
+
+        // Handle browser Back/Forward navigation
+        window.addEventListener('popstate', function(e) {
+            loadPageDynamic(window.location.search || 'index.php', false);
         });
     </script>
 
@@ -242,7 +431,7 @@ $isDarkMode = ($theme === 'dark');
 
             <main class="flex-1 overflow-x-hidden overflow-y-auto bg-darkbg p-6">
                 <!-- Dynamic Content Routing -->
-                <div class="animate-fade-in-up w-full h-full max-w-screen-2xl mx-auto">
+                <div id="main-page-content" class="animate-fade-in-up w-full h-full max-w-screen-2xl mx-auto">
                 <?php 
                     $page = isset($_GET['page']) ? preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['page']) : 'dashboard';
                     $pagePath = "pages/{$page}.php";

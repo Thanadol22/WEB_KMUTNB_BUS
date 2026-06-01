@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'username' => $data['username'] ?? '',
                 'password' => $data['password'] ?? '',
                 'phone' => $data['phone'] ?? '',
-                'role' => $data['role'] ?? 'student',
+                'role' => $data['role'] ?? 'user',
                 'status' => $data['status'] ?? 'active',
                 'fcm_token' => '',
                 'created_at' => date('F j, Y \a\t g:i:s A \U\T\C\+7') // E.g., "March 31, 2026 at 2:09:10 PM UTC+7"
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'username' => $data['username'] ?? '',
                 'password' => $data['password'] ?? '',
                 'phone' => $data['phone'] ?? '',
-                'role' => $data['role'] ?? 'student',
+                'role' => $data['role'] ?? 'user',
                 'status' => $data['status'] ?? 'active',
                 // Keep fcm_token empty for web admin edits or you could ideally merge it
                 'fcm_token' => $data['fcm_token'] ?? '',
